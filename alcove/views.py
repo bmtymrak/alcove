@@ -41,7 +41,6 @@ def capture(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse:
                 book=form.cleaned_data["book"],
             )
         except notes.NoteError as exc:
-            form.document_rejected = str(exc) != "Write something before saving."
             for field, messages in exc.fields.items():
                 for message in messages:
                     form.add_error(field, message)
@@ -94,9 +93,6 @@ def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
                 book=form.cleaned_data["book"],
             )
         except notes.NoteError as exc:
-            form.document_rejected = exc.status == 400 and str(exc) != (
-                "Write something before saving."
-            )
             form.add_error(None, str(exc))
             status = exc.status
         else:

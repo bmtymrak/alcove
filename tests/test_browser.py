@@ -246,3 +246,28 @@ def test_existing_plain_note_gains_formatting_and_keeps_draft_after_network_erro
     assert updated["content"]["format"] == "tiptap"
     assert updated["plain_text"] == note["plain_text"]
     assert updated["revision"] == 2
+
+
+def test_emphasis_across_a_line_break_round_trips(page, live_server, owner):
+    page.goto(live_server.url + "/login/")
+    page.get_by_label("Username").fill("reader")
+    page.get_by_label("Password").fill(PASSWORD)
+    page.get_by_role("button", name="Sign in", exact=True).click()
+    page.get_by_role("link", name="Capture a note", exact=True).click()
+    editor = page.get_by_role("textbox", name="Your note", exact=True)
+    editor.fill("First")
+    editor.press("End")
+    editor.press("Shift+Enter")
+    editor.press_sequentially("Second")
+    editor.press("ControlOrMeta+a")
+    page.get_by_role("button", name="Bold", exact=True).click()
+    page.get_by_role("button", name="Italic", exact=True).click()
+    page.get_by_role("button", name="Save note", exact=True).click()
+    expect(page.locator(".note-content")).to_have_text("FirstSecond")
+    expect(page.locator(".note-content br")).to_have_count(1)
+    page.get_by_role("link", name="Edit note", exact=True).click()
+    expect(editor.locator("strong")).to_have_text("FirstSecond")
+    expect(editor.locator("em")).to_have_text("FirstSecond")
+    expect(editor.locator("br")).to_have_count(1)
+    page.get_by_role("button", name="Save changes", exact=True).click()
+    expect(page.locator(".note-content br")).to_have_count(1)

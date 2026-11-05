@@ -82,18 +82,20 @@ CONTENT_COMPONENTS = {
         {
             "type": {"type": "string", "const": "text"},
             "text": {"type": "string", "minLength": 1, "maxLength": 100_000},
-            "marks": {
-                "type": "array",
-                "maxItems": 3,
-                "uniqueItems": True,
-                "items": ref("NoteMark"),
-            },
+            "marks": ref("NoteMarks"),
         },
         ["type", "text"],
     ),
     "NoteHardBreak": object_schema(
-        {"type": {"type": "string", "const": "hardBreak"}}, ["type"]
+        {"type": {"type": "string", "const": "hardBreak"}, "marks": ref("NoteMarks")},
+        ["type"],
     ),
+    "NoteMarks": {
+        "type": "array",
+        "maxItems": 3,
+        "uniqueItems": True,
+        "items": ref("NoteMark"),
+    },
     "NoteMark": {
         "oneOf": [
             object_schema(

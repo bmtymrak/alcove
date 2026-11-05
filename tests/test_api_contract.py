@@ -177,6 +177,17 @@ def test_formatted_content_contract_matches_both_deliveries(signed_in):
                     {"type": "listItem", "content": [paragraph("An observation")]},
                 ],
             },
+            {
+                "type": "paragraph",
+                "content": [
+                    {"type": "text", "text": "First", "marks": [{"type": "bold"}]},
+                    {
+                        "type": "hardBreak",
+                        "marks": [{"type": "bold"}, {"type": "italic"}],
+                    },
+                    {"type": "text", "text": "Second", "marks": [{"type": "bold"}]},
+                ],
+            },
             paragraph(
                 "Website", [{"type": "link", "attrs": {"href": "http://example.org/"}}]
             ),

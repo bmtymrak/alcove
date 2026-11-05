@@ -67,11 +67,13 @@ def validate(value: Any) -> tuple[dict[str, Any], str]:
             kind = node.get("type")
             if not isinstance(kind, str) or kind not in allowed:
                 invalid()
-            if kind == "text":
-                if (
-                    set(node) - {"type", "text", "marks"}
-                    or not valid_string(node.get("text"))
-                    or not node["text"]
+            if kind in {"text", "hardBreak"}:
+                keys = (
+                    {"type", "marks", "text"} if kind == "text" else {"type", "marks"}
+                )
+                if set(node) - keys or (
+                    kind == "text"
+                    and (not valid_string(node.get("text")) or not node["text"])
                 ):
                     invalid()
                 marks = node.get("marks", [])
@@ -98,11 +100,7 @@ def validate(value: Any) -> tuple[dict[str, Any], str]:
                         validate_link(mark["attrs"]["href"])
                     else:
                         invalid()
-                return node["text"]
-            if kind == "hardBreak":
-                if set(node) != {"type"}:
-                    invalid()
-                return "\n"
+                return node["text"] if kind == "text" else "\n"
             keys = (
                 {"type", "content", "attrs"}
                 if kind == "orderedList"
@@ -156,8 +154,8 @@ def render(value: Any) -> str:
 
     def node_html(node: dict[str, Any]) -> str:
         kind = node["type"]
-        if kind == "text":
-            result = escape(node["text"])
+        if kind in {"text", "hardBreak"}:
+            result = escape(node["text"]) if kind == "text" else "<br>"
             for mark in reversed(node.get("marks", [])):
                 if mark["type"] == "link":
                     href = escape(mark["attrs"]["href"], quote=True)
@@ -166,8 +164,6 @@ def render(value: Any) -> str:
                     tag = "strong" if mark["type"] == "bold" else "em"
                     result = f"<{tag}>{result}</{tag}>"
             return result
-        if kind == "hardBreak":
-            return "<br>"
         children = "".join(node_html(child) for child in node.get("content", []))
         if kind == "doc":
             return children

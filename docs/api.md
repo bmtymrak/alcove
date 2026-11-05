@@ -97,8 +97,8 @@ OpenAPI. Allowed blocks are `paragraph`, `blockquote`, `bulletList`, and
 `orderedList`. The root `doc` and blockquotes contain one or more blocks. Lists
 contain one or more `listItem` nodes, each beginning with a paragraph and optionally
 followed by more blocks (including nested lists). Paragraphs may be empty and
-contain only `text` and `hardBreak` nodes. Text nodes need a nonempty string and
-optionally `marks`: `bold`, `italic`, or `link`, each at most once per node.
+contain only `text` and `hardBreak` nodes. Text nodes need a nonempty string.
+Both text and hard breaks may optionally carry `marks`: `bold`, `italic`, or `link`, each at most once per node.
 Only link marks accept `attrs`, containing just `href`. Ordered lists optionally
 accept `attrs` containing just `start` (integer 1–2147483647; omitted means 1).
 All other node/mark attributes and unsupported properties, nodes, or formats are

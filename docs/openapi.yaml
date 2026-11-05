@@ -667,6 +667,8 @@ components:
         type:
           type: string
           const: hardBreak
+        marks:
+          $ref: '#/components/schemas/NoteMarks'
       required:
       - type
     NoteListItem:
@@ -720,6 +722,12 @@ components:
         required:
         - type
         - attrs
+    NoteMarks:
+      type: array
+      maxItems: 3
+      uniqueItems: true
+      items:
+        $ref: '#/components/schemas/NoteMark'
     NoteOrderedList:
       type: object
       additionalProperties: false
@@ -792,11 +800,7 @@ components:
           minLength: 1
           maxLength: 100000
         marks:
-          type: array
-          maxItems: 3
-          uniqueItems: true
-          items:
-            $ref: '#/components/schemas/NoteMark'
+          $ref: '#/components/schemas/NoteMarks'
       required:
       - type
       - text
