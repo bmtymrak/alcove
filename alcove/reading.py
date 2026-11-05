@@ -4,7 +4,7 @@ from django.core.paginator import InvalidPage, Page, Paginator
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 
-from .models import Collection, Note
+from .models import Book, Collection, Note
 
 PAGE_SIZE = 20
 
@@ -20,3 +20,41 @@ def notes(collection: Collection, page: int | str = 1) -> Page[Note]:
 
 def note(collection: Collection, note_id: UUID) -> Note:
     return get_object_or_404(Note, collection=collection, pk=note_id)
+
+
+def library(collection: Collection, page: int | str = 1) -> Page[Book]:
+    try:
+        return Paginator(Book.objects.filter(collection=collection), PAGE_SIZE).page(
+            page
+        )
+    except InvalidPage as exc:
+        raise Http404("Page not found.") from exc
+
+
+def book(collection: Collection, book_id: UUID) -> Book:
+    return get_object_or_404(Book, collection=collection, pk=book_id)
+
+
+def book_options(collection: Collection) -> list[tuple[str, str]]:
+    return [
+        (str(book.id), f"{book.title} — {book.author}" if book.author else book.title)
+        for book in Book.objects.filter(collection=collection)
+    ]
+
+
+def book_notes(
+    collection: Collection, book_id: UUID, page: int | str = 1, order: str = "oldest"
+) -> Page[Note]:
+    book(collection, book_id)
+    if order not in {"oldest", "newest"}:
+        raise Http404("Order not found.")
+    ordering = ("captured_at", "id") if order == "oldest" else ("-captured_at", "-id")
+    try:
+        return Paginator(
+            Note.objects.filter(collection=collection, book_id=book_id).order_by(
+                *ordering
+            ),
+            PAGE_SIZE,
+        ).page(page)
+    except InvalidPage as exc:
+        raise Http404("Page not found.") from exc

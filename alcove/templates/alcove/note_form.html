@@ -1,8 +1,9 @@
 {% extends "alcove/base.html" %}
 {% block title %}{% if note %}Edit note{% else %}Capture a note{% endif %} · Alcove{% endblock %}
 {% block content %}
-<a href="{% url 'index' %}">← All notes</a>
+<a href="{% url 'notes' %}">← All notes</a>
 <h1>{% if note %}Edit note{% else %}Capture a note{% endif %}</h1>
+{% if source_book %}<p>Capturing from <a href="{% url 'book' source_book.id %}">{{ source_book.title }}</a></p>{% endif %}
 <p id="content-help">A thought, a quotation, a sentence. No title or book needed.</p>
 <form method="post" class="panel">
   {% csrf_token %}
@@ -10,7 +11,8 @@
   {{ form.as_p }}
   <div class="actions">
     <button>{% if note %}Save changes{% else %}Save note{% endif %}</button>
-    {% if note %}<a href="{% url 'note' note.id %}">Open current note</a>{% else %}<a href="{% url 'index' %}">Cancel</a>{% endif %}
+    {% if not note %}<button name="add_another" value="1">Save and add another</button>{% endif %}
+    {% if note %}<a href="{% url 'note' note.id %}">Open current note</a>{% else %}<a href="{% url 'notes' %}">Cancel</a>{% endif %}
   </div>
 </form>
 {% endblock %}

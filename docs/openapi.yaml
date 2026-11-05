@@ -6,6 +6,240 @@ info:
     the csrftoken cookie in X-CSRFToken on POST/PATCH. Notes use stable UUIDs and
     UTC timestamps. See docs/api.md.
 paths:
+  /api/v1/books/:
+    get:
+      operationId: books_list
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page; 20 Books ordered by title then UUID.
+      tags:
+      - books
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookPage'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+    post:
+      operationId: books_create
+      tags:
+      - books
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookCreateRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
+  /api/v1/books/{book_id}/:
+    get:
+      operationId: books_read
+      parameters:
+      - in: path
+        name: book_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - books
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+    patch:
+      operationId: books_edit
+      parameters:
+      - in: path
+        name: book_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - books
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookEditRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
+  /api/v1/books/{book_id}/notes/:
+    get:
+      operationId: books_notes
+      parameters:
+      - in: path
+        name: book_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: order
+        schema:
+          type: string
+          enum:
+          - newest
+          - oldest
+        description: Default oldest. Capture timestamp then UUID; newest reverses
+          both.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page; 20 Notes.
+      tags:
+      - books
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotePage'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
   /api/v1/notes/:
     get:
       operationId: notes_list
@@ -196,11 +430,72 @@ paths:
           description: Stale revision; no change.
 components:
   schemas:
+    Book:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        author:
+          type: string
+      required:
+      - author
+      - id
+      - title
+    BookCreateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        author:
+          type: string
+          maxLength: 300
+      required:
+      - title
+    BookEditRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        author:
+          type: string
+          maxLength: 300
+    BookPage:
+      type: object
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Book'
+      required:
+      - count
+      - page
+      - page_size
+      - results
     CaptureRequest:
       type: object
       properties:
         content:
           $ref: '#/components/schemas/ContentRequest'
+        book:
+          type:
+          - string
+          - 'null'
+          format: uuid
       required:
       - content
     Content:
@@ -238,13 +533,17 @@ components:
       properties:
         content:
           $ref: '#/components/schemas/ContentRequest'
+        book:
+          type:
+          - string
+          - 'null'
+          format: uuid
         revision:
           type: integer
           maximum: 9223372036854775806
           minimum: 1
           format: int64
       required:
-      - content
       - revision
     Error:
       type: object
@@ -280,6 +579,11 @@ components:
           format: uuid
         content:
           $ref: '#/components/schemas/Content'
+        book:
+          type:
+          - string
+          - 'null'
+          format: uuid
         plain_text:
           type: string
         captured_at:
@@ -292,6 +596,7 @@ components:
           type: integer
           minimum: 1
       required:
+      - book
       - captured_at
       - content
       - id

@@ -94,3 +94,68 @@ def test_schema_is_available_to_the_signed_in_owner(signed_in):
     response = signed_in.get("/api/v1/schema/?format=json")
     assert response.status_code == 200
     assert response.json() == SCHEMA
+
+
+def test_book_and_source_contracts_match_real_requests_and_responses(signed_in):
+    books = "/api/v1/books/"
+    detail = "/api/v1/books/{book_id}/"
+    book_notes = "/api/v1/books/{book_id}/notes/"
+    payload = {"title": "A documented book"}
+    validate_request(payload, books, "post")
+    response = json_request(signed_in, "post", books, payload)
+    validate_response(response, books, "post", 201)
+    book = response.json()
+    path = response["Location"]
+    validate_response(signed_in.get(path), detail, "get", 200)
+    validate_response(signed_in.get(books), books, "get", 200)
+    payload = {"author": "A documented author"}
+    validate_request(payload, detail, "patch")
+    validate_response(
+        json_request(signed_in, "patch", path, payload), detail, "patch", 200
+    )
+    payload = {"content": document("A sourced thought."), "book": book["id"]}
+    validate_request(payload, COLLECTION, "post")
+    response = json_request(signed_in, "post", COLLECTION, payload)
+    validate_response(response, COLLECTION, "post", 201)
+    note_path = response["Location"]
+    assert response.json()["book"] == book["id"]
+    validate_response(
+        signed_in.get(path + "notes/?order=newest"), book_notes, "get", 200
+    )
+    payload = {"book": None, "revision": 1}
+    validate_request(payload, DETAIL, "patch")
+    response = json_request(signed_in, "patch", note_path, payload)
+    validate_response(response, DETAIL, "patch", 200)
+    assert response.json()["book"] is None
+    validate_response(
+        json_request(signed_in, "patch", note_path, payload), DETAIL, "patch", 409
+    )
+    validate_response(
+        json_request(signed_in, "post", books, {"title": ""}), books, "post", 400
+    )
+    validate_response(
+        json_request(signed_in, "patch", path, {"title": ""}), detail, "patch", 400
+    )
+    validate_response(signed_in.get(books + "?page=0"), books, "get", 404)
+    validate_response(
+        signed_in.get(path + "notes/?order=invalid"), book_notes, "get", 404
+    )
+    missing = "/api/v1/books/00000000-0000-0000-0000-000000000000/"
+    validate_response(signed_in.get(missing), detail, "get", 404)
+    validate_response(signed_in.get(missing + "notes/"), book_notes, "get", 404)
+    validate_response(
+        json_request(signed_in, "patch", missing, {"title": "Missing"}),
+        detail,
+        "patch",
+        404,
+    )
+    foreign_source = json_request(
+        signed_in,
+        "post",
+        COLLECTION,
+        {
+            "content": document("Rejected."),
+            "book": "00000000-0000-0000-0000-000000000000",
+        },
+    )
+    validate_response(foreign_source, COLLECTION, "post", 400)

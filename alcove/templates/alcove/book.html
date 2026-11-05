@@ -1,0 +1,11 @@
+{% extends "alcove/base.html" %}
+{% block title %}{{ book.title }} · Alcove{% endblock %}
+{% block content %}
+<a href="{% url 'index' %}">← Book library</a>
+<h1>{{ book.title }}</h1>
+{% if book.author %}<p>{{ book.author }}</p>{% endif %}
+<div class="actions"><a class="button" href="{% url 'book-capture' book.id %}">Capture a note from this book</a><a href="{% url 'book-edit' book.id %}">Edit book</a></div>
+<form method="get" class="actions"><label for="order">Capture order</label>
+<select name="order" id="order"><option value="oldest"{% if order == 'oldest' %} selected{% endif %}>Oldest first</option><option value="newest"{% if order == 'newest' %} selected{% endif %}>Newest first</option></select><button>Apply order</button></form>
+{% include "alcove/note_list.html" %}
+{% endblock %}

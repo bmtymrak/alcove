@@ -6,13 +6,14 @@ header { max-width: 58rem; margin: auto; padding: 1.25rem 1.5rem; display: flex;
 nav { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 nav form { margin: 0; }
 main { max-width: 46rem; padding: 2.5rem 1.5rem; margin: auto; }
+h1, h2 { overflow-wrap: anywhere; }
 h1 { font-family: Georgia, serif; font-weight: normal; font-size: clamp(2rem, 5vw, 2.7rem); line-height: 1.2; }
 a { color: #315c40; text-underline-offset: 0.2em; }
 .eyebrow { font-size: 0.75rem; letter-spacing: 0.13em; color: #536549; }
 .panel { background: #fffef9; border: 1px solid #d7dcd3; border-radius: 0.65rem; padding: 1.5rem; margin: 1.25rem 0; overflow-wrap: anywhere; }
 .login { max-width: 32rem; margin: 2rem auto; }
 label { display: block; font-weight: 600; margin: 1rem 0 0.5rem; }
-input, textarea { width: 100%; font: inherit; color: inherit; border: 1px solid #7a8978; border-radius: 0.3rem; padding: 0.7rem; background: white; }
+input, textarea, select { width: 100%; font: inherit; color: inherit; border: 1px solid #7a8978; border-radius: 0.3rem; padding: 0.7rem; background: white; }
 textarea { min-height: 12rem; resize: vertical; }
 button, .button { display: inline-block; cursor: pointer; font: inherit; font-weight: 600; background: #315c40; color: white; border: 1px solid #315c40; border-radius: 0.3rem; padding: 0.65rem 1rem; text-decoration: none; min-height: 44px; }
 button.quiet { background: transparent; color: #315c40; }

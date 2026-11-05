@@ -31,9 +31,11 @@ class ContentSerializer(serializers.Serializer):
 
 class CaptureSerializer(StrictSerializer):
     content = ContentSerializer()
+    book = serializers.UUIDField(required=False, allow_null=True)
 
 
 class EditSerializer(CaptureSerializer):
+    content = ContentSerializer(required=False)
     revision = serializers.IntegerField(
         min_value=1,
         max_value=notes.MAX_EXPECTED_REVISION,
@@ -43,6 +45,7 @@ class EditSerializer(CaptureSerializer):
 class NoteSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     content = ContentSerializer()
+    book = serializers.UUIDField(source="book_id", allow_null=True)
     plain_text = serializers.CharField()
     captured_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
@@ -65,3 +68,26 @@ class ErrorDetailSerializer(serializers.Serializer):
 
 class ErrorSerializer(serializers.Serializer):
     error = ErrorDetailSerializer()
+
+
+class BookCreateSerializer(StrictSerializer):
+    title = serializers.CharField(max_length=300)
+    author = serializers.CharField(max_length=300, required=False, allow_blank=True)
+
+
+class BookEditSerializer(StrictSerializer):
+    title = serializers.CharField(max_length=300, required=False)
+    author = serializers.CharField(max_length=300, required=False, allow_blank=True)
+
+
+class BookSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    title = serializers.CharField()
+    author = serializers.CharField(allow_blank=True)
+
+
+class BookPageSerializer(serializers.Serializer):
+    count = serializers.IntegerField(min_value=0)
+    page = serializers.IntegerField(min_value=1)
+    page_size = serializers.IntegerField()
+    results = BookSerializer(many=True)

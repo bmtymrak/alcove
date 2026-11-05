@@ -1,7 +1,9 @@
+from enum import Enum
 from typing import Any, TypedDict
 from uuid import UUID
 
 from django.db import transaction
+from django.http import Http404
 from django.utils import timezone
 
 from . import reading
@@ -70,17 +72,40 @@ def validated_content(value: Any) -> Content:
     return plain_text_content(text)
 
 
-def capture(collection: Collection, content: Any) -> Note:
+class SourceChange(Enum):
+    UNCHANGED = "unchanged"
+
+
+def validated_book(collection: Collection, book_id: UUID | None) -> UUID | None:
+    if book_id is not None:
+        try:
+            reading.book(collection, book_id)
+        except Http404 as exc:
+            raise NoteError(
+                "Choose a Book from your Collection.",
+                fields={"book": ["Choose a Book from your Collection."]},
+            ) from exc
+    return book_id
+
+
+def capture(collection: Collection, content: Any, book: UUID | None = None) -> Note:
     document = validated_content(content)
+    book_id = validated_book(collection, book)
     return Note.objects.create(
         collection=collection,
+        book_id=book_id,
         content=document,
         plain_text=document["text"],
     )
 
 
-@transaction.atomic
-def edit(collection: Collection, note_id: UUID, content: Any, revision: int) -> Note:
+def edit(
+    collection: Collection,
+    note_id: UUID,
+    content: Any,
+    revision: int,
+    book: UUID | None | SourceChange = SourceChange.UNCHANGED,
+) -> Note:
     if type(revision) is not int or not 1 <= revision <= MAX_EXPECTED_REVISION:
         raise NoteError(
             "Invalid revision.",
@@ -88,25 +113,29 @@ def edit(collection: Collection, note_id: UUID, content: Any, revision: int) -> 
                 "revision": [f"Use a revision between 1 and {MAX_EXPECTED_REVISION}."],
             },
         )
-    document = validated_content(content)
-    # Take the SQLite write lock before reading inside this transaction. A
-    # deferred read-then-write upgrade can fail immediately under concurrent saves.
-    changed = Note.objects.filter(
-        collection=collection,
-        pk=note_id,
-        revision=revision,
-    ).update(
-        content=document,
-        plain_text=document["text"],
-        revision=revision + 1,
-        updated_at=timezone.now(),
-    )
-    note = reading.note(collection, note_id)
-    if not changed:
-        raise NoteError(
-            "This Note changed elsewhere. Your text has not been saved. "
-            "Open the current Note before trying again.",
-            code="conflict",
-            status=409,
-        )
-    return note
+    changes: dict[str, Any] = {
+        "revision": revision + 1,
+        "updated_at": timezone.now(),
+    }
+    if content is not None:
+        document = validated_content(content)
+        changes.update(content=document, plain_text=document["text"])
+    if not isinstance(book, SourceChange):
+        changes["book_id"] = validated_book(collection, book)
+    # Validate references before the transaction so the first transactional
+    # database operation takes SQLite's write lock, including for source edits.
+    with transaction.atomic():
+        changed = Note.objects.filter(
+            collection=collection,
+            pk=note_id,
+            revision=revision,
+        ).update(**changes)
+        note = reading.note(collection, note_id)
+        if not changed:
+            raise NoteError(
+                "This Note changed elsewhere. Your text has not been saved. "
+                "Open the current Note before trying again.",
+                code="conflict",
+                status=409,
+            )
+        return note

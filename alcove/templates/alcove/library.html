@@ -1,0 +1,14 @@
+{% extends "alcove/base.html" %}
+{% block title %}Book library · Alcove{% endblock %}
+{% block content %}
+<p class="eyebrow">YOUR PRIVATE COLLECTION</p>
+<h1>Book library</h1>
+<div class="actions"><a class="button" href="{% url 'book-create' %}">Add a book</a><a href="{% url 'capture' %}">Capture a note</a><a href="{% url 'notes' %}">All notes</a></div>
+{% for book in books %}<article class="panel"><h2><a href="{% url 'book' book.id %}">{{ book.title }}</a></h2>{% if book.author %}<p>{{ book.author }}</p>{% endif %}</article>
+{% empty %}<p>No books yet. Add the book you are reading.</p>{% endfor %}
+<nav aria-label="Book pages">
+{% if books.has_previous %}<a href="?page={{ books.previous_page_number }}">Previous</a>{% endif %}
+<span>Page {{ books.number }} of {{ books.paginator.num_pages }}</span>
+{% if books.has_next %}<a href="?page={{ books.next_page_number }}">Next</a>{% endif %}
+</nav>
+{% endblock %}

@@ -5,13 +5,13 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_http_methods
 
-from . import collections, notes, reading
-from .forms import CaptureForm, EditForm
+from . import books, collections, notes, reading
+from .forms import BookForm, CaptureForm, EditForm
 
 
 @login_required
 @require_GET
-def index(request: HttpRequest) -> HttpResponse:
+def note_list(request: HttpRequest) -> HttpResponse:
     collection = collections.for_owner(request.user)
     return render(
         request,
@@ -24,23 +24,35 @@ def index(request: HttpRequest) -> HttpResponse:
 
 @login_required
 @require_http_methods(["GET", "POST"])
-def capture(request: HttpRequest) -> HttpResponse:
+def capture(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse:
     collection = collections.for_owner(request.user)
-    form = CaptureForm(request.POST if request.method == "POST" else None)
+    book = reading.book(collection, book_id) if book_id else None
+    form = CaptureForm(
+        request.POST if request.method == "POST" else None,
+        initial={"book": book.id} if book else None,
+        book_options=reading.book_options(collection),
+    )
     if request.method == "POST" and form.is_valid():
         try:
             note = notes.capture(
                 collection,
                 notes.plain_text_content(form.cleaned_data["content"]),
+                book=form.cleaned_data["book"],
             )
         except notes.NoteError as exc:
-            form.add_error("content", str(exc))
+            for field, messages in exc.fields.items():
+                for message in messages:
+                    form.add_error(field, message)
         else:
+            if "add_another" in request.POST:
+                if note.book_id:
+                    return redirect("book-capture", book_id=note.book_id)
+                return redirect("capture")
             return redirect("note", note_id=note.id)
     return render(
         request,
         "alcove/note_form.html",
-        {"form": form},
+        {"form": form, "source_book": book},
         status=400 if form.is_bound else 200,
     )
 
@@ -59,7 +71,12 @@ def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
     note = reading.note(collection, note_id)
     form = EditForm(
         request.POST if request.method == "POST" else None,
-        initial={"content": note.plain_text, "revision": note.revision},
+        initial={
+            "content": note.plain_text,
+            "revision": note.revision,
+            "book": note.book_id,
+        },
+        book_options=reading.book_options(collection),
     )
     status = 400 if form.is_bound else 200
     if request.method == "POST" and form.is_valid():
@@ -69,6 +86,7 @@ def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
                 note_id,
                 notes.plain_text_content(form.cleaned_data["content"]),
                 form.cleaned_data["revision"],
+                book=form.cleaned_data["book"],
             )
         except notes.NoteError as exc:
             form.add_error(None, str(exc))
@@ -88,3 +106,66 @@ def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
 
 def csrf_failure(request: HttpRequest, reason: str = "") -> HttpResponse:
     return render(request, "alcove/csrf_failure.html", status=403)
+
+
+@login_required
+@require_GET
+def index(request: HttpRequest) -> HttpResponse:
+    return render(
+        request,
+        "alcove/library.html",
+        {
+            "books": reading.library(
+                collections.for_owner(request.user), request.GET.get("page", "1")
+            )
+        },
+    )
+
+
+@login_required
+@require_GET
+def book_detail(request: HttpRequest, book_id: UUID) -> HttpResponse:
+    book = reading.book(collections.for_owner(request.user), book_id)
+    return render(
+        request,
+        "alcove/book.html",
+        {
+            "book": book,
+            "notes": reading.book_notes(
+                collections.for_owner(request.user),
+                book_id,
+                request.GET.get("page", "1"),
+                request.GET.get("order", "oldest"),
+            ),
+            "order": request.GET.get("order", "oldest"),
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def book_form(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse:
+    collection = collections.for_owner(request.user)
+    book = reading.book(collection, book_id) if book_id else None
+    form = BookForm(
+        request.POST if request.method == "POST" else None,
+        initial={"title": book.title, "author": book.author} if book else None,
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            if book:
+                book = books.edit(collection, book.id, **form.cleaned_data)
+            else:
+                book = books.create(collection, **form.cleaned_data)
+        except notes.NoteError as exc:
+            for field, messages in exc.fields.items():
+                for message in messages:
+                    form.add_error(field, message)
+        else:
+            return redirect("book", book_id=book.id)
+    return render(
+        request,
+        "alcove/book_form.html",
+        {"book": book, "form": form},
+        status=400 if form.is_bound else 200,
+    )

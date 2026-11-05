@@ -282,7 +282,7 @@ def test_content_is_displayed_as_text_and_not_executed_as_html(signed_in):
     )
     assert response.status_code == 201
     note = response.json()
-    for path in ["/", f"/notes/{note['id']}/", f"/notes/{note['id']}/edit/"]:
+    for path in ["/notes/", f"/notes/{note['id']}/", f"/notes/{note['id']}/edit/"]:
         rendered = signed_in.get(path).content.decode()
         assert "<script>" not in rendered
         assert escape(text) in rendered
@@ -327,6 +327,6 @@ def test_pagination_has_stable_capture_order_and_no_missing_notes(signed_in):
     assert first["count"] == second["count"] == 21
     assert [n["id"] for n in first["results"]] == ids[:20]
     assert [n["id"] for n in second["results"]] == ids[20:]
-    assert "Thought 20." in signed_in.get("/?page=2").content.decode()
+    assert "Thought 20." in signed_in.get("/notes/?page=2").content.decode()
     for page in ["0", "3", "oops"]:
         assert signed_in.get(f"/api/v1/notes/?page={page}").status_code == 404

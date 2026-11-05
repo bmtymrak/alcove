@@ -1,8 +1,9 @@
 {% extends "alcove/base.html" %}
 {% block title %}Read note · Alcove{% endblock %}
 {% block content %}
-<a href="{% url 'index' %}">← All notes</a>
+<a href="{% url 'notes' %}">← All notes</a>
 <h1>Your note</h1>
+{% if note.book %}<p>Source: <a href="{% url 'book' note.book.id %}">{{ note.book.title }}</a>{% if note.book.author %} · {{ note.book.author }}{% endif %}</p>{% endif %}
 <article class="panel">
   <p class="note-content">{{ note.plain_text }}</p>
   <p class="metadata">Captured {{ note.captured_at|date:"M j, Y, H:i" }} UTC<br>Updated {{ note.updated_at|date:"M j, Y, H:i" }} UTC</p>

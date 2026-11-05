@@ -1,8 +1,10 @@
 # Alcove
 
 A private Collection of reading notes, served by Django templates and a same-origin
-versioned JSON API. This first slice implements owner sign-in and standalone Note
-capture, reading, and explicit editing ([Ticket #3](https://github.com/bmtymrak/alcove/issues/3)).
+versioned JSON API. Sign in to a Book library, add Books with optional authors,
+and repeatedly capture their Notes with Save and add another. General Note capture,
+inline Book reading, source editing, and oldest/newest capture ordering are available
+through HTML and JSON ([Ticket #4](https://github.com/bmtymrak/alcove/issues/4)).
 
 ## Run locally
 
@@ -54,7 +56,8 @@ apply migrations, and never use the saved Collection. HTTP integration tests rea
 persisted results back through public routes and exercise sessions, CSRF, validation,
 pagination, revision conflicts, and a second owner's private Collection. Browser
 tests run a local Django server and Chromium at desktop and phone sizes; they cover
-capture, reload, explicit editing, retained invalid input, conflicts, and sign-out.
+capture, repeated Book marginalia capture, inline reading, ordering, reload, explicit
+editing, retained invalid input, conflicts, and sign-out.
 For a focused run use `uv run pytest tests/test_notes_http.py` or
 `uv run pytest tests/test_browser.py`. If browser downloads are stored in a custom
 location, set `PLAYWRIGHT_BROWSERS_PATH` for both installation and test runs.
@@ -62,8 +65,10 @@ location, set `PLAYWRIGHT_BROWSERS_PATH` for both installation and test runs.
 ## Application boundaries
 
 `alcove.collections.for_owner` resolves the authenticated Collection.
-`alcove.notes.capture/edit` own content validation, projection, and mutation;
-`alcove.reading.notes/note` own scoped retrieval and deterministic pagination.
+`alcove.books.create/edit` own Book metadata changes.
+`alcove.notes.capture/edit` own content validation, projection, source validation,
+and revision-checked mutation; `alcove.reading` owns scoped Book/Note retrieval,
+ordering, and deterministic pagination.
 Both HTML views and JSON handlers call those interfaces with Collection context.
 The modules persist directly through Django's ORM. Domain rules stay out of the
 transport adapters. No internal module tests or persistence mocks are required.
@@ -73,7 +78,14 @@ versioned content, and a derived plain-text projection. This slice accepts a
 `plain-text` document and safely renders it as escaped text. Future formatting can
 extend supported document formats while keeping capture/read/edit operations and
 the plain-text projection. A title, Book, Topic, and specialized Note type are not
-required. Books, rich text, drafts, autosave, retry idempotency, search, Topics,
-links, trash, and portability remain later tickets from Spec #2.
+required. Each Note can have one source Book or none. Book titles need not be
+unique; title alone is enough to create a Book. The library is the signed-in start
+page at `/`, with all Notes still available at `/notes/`. A Book page shows its
+Notes inline, oldest capture first by default, with a newest-first option; Save
+and add another retains the selected Book. Existing standalone Notes remain
+unassigned after upgrading. Apply the new migrations before starting the server.
+
+Rich text, drafts, autosave, retry idempotency, search, Topics, links, trash, and
+portability remain later tickets from Spec #2.
 
 See [the API guide](docs/api.md) and [checked OpenAPI schema](docs/openapi.yaml).

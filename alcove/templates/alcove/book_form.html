@@ -1,0 +1,11 @@
+{% extends "alcove/base.html" %}
+{% block title %}{% if book %}Edit book{% else %}Add a book{% endif %} · Alcove{% endblock %}
+{% block content %}
+<a href="{% url 'index' %}">← Book library</a>
+<h1>{% if book %}Edit book{% else %}Add a book{% endif %}</h1>
+<form method="post" class="panel">{% csrf_token %}
+{% if form.errors %}<div role="alert">Your book has not been saved.</div>{% endif %}
+{{ form.as_p }}
+<button>Save book</button>
+</form>
+{% endblock %}

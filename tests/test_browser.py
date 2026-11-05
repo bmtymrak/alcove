@@ -73,3 +73,53 @@ def test_browser_retains_invalid_and_conflicted_input(page, live_server, owner):
     page.get_by_role("link", name="Open current note").click()
     expect(page.get_by_text("Saved in another tab.", exact=True)).to_be_visible()
     second_tab.close()
+
+
+@pytest.mark.parametrize(
+    "viewport", [{"width": 1280, "height": 900}, {"width": 390, "height": 844}]
+)
+def test_book_marginalia_capture_and_inline_reading(page, live_server, owner, viewport):
+    page.set_viewport_size(viewport)
+    page.goto(live_server.url)
+    page.get_by_label("Username").fill("reader")
+    page.get_by_label("Password").fill(PASSWORD)
+    page.get_by_role("button", name="Sign in", exact=True).click()
+    expect(page.get_by_role("heading", name="Book library")).to_be_visible()
+    page.get_by_role("link", name="Add a book", exact=True).click()
+    page.get_by_label("Title").fill("Ways of Seeing")
+    page.get_by_label("Author").fill("John Berger")
+    page.get_by_role("button", name="Save book", exact=True).click()
+    book_url = page.url
+    page.get_by_role("link", name="Capture a note from this book").click()
+    selected_book = page.get_by_label("Source book").input_value()
+    assert selected_book
+    page.get_by_label("Your note").fill("First marginalium.")
+    page.get_by_role("button", name="Save and add another", exact=True).click()
+    expect(page.get_by_label("Your note")).to_have_value("")
+    expect(page.get_by_label("Source book")).to_have_value(selected_book)
+    page.get_by_role("button", name="Save and add another", exact=True).click()
+    expect(
+        page.get_by_text("Write something before saving.", exact=True)
+    ).to_be_visible()
+    expect(page.get_by_label("Source book")).to_have_value(selected_book)
+    page.get_by_label("Your note").fill("Second marginalium.")
+    page.get_by_role("button", name="Save note", exact=True).click()
+    page.goto(book_url)
+    expect(page.locator(".note-content")).to_have_text(
+        ["First marginalium.", "Second marginalium."]
+    )
+    page.get_by_label("Capture order").select_option("newest")
+    page.get_by_role("button", name="Apply order", exact=True).click()
+    expect(page.locator(".note-content")).to_have_text(
+        ["Second marginalium.", "First marginalium."]
+    )
+    page.reload()
+    expect(page.get_by_label("Capture order")).to_have_value("newest")
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    page.get_by_role("link", name="Open note", exact=False).first.click()
+    expect(page.get_by_role("link", name="Ways of Seeing", exact=True)).to_be_visible()
+    page.get_by_role("link", name="Edit note", exact=True).click()
+    page.get_by_label("Source book").select_option("")
+    page.get_by_role("button", name="Save changes", exact=True).click()
+    page.goto(book_url)
+    expect(page.locator(".note-content")).to_have_text(["First marginalium."])
