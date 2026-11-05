@@ -1,0 +1,16 @@
+{% extends "alcove/base.html" %}
+{% block title %}{% if note %}Edit note{% else %}Capture a note{% endif %} · Alcove{% endblock %}
+{% block content %}
+<a href="{% url 'index' %}">← All notes</a>
+<h1>{% if note %}Edit note{% else %}Capture a note{% endif %}</h1>
+<p id="content-help">A thought, a quotation, a sentence. No title or book needed.</p>
+<form method="post" class="panel">
+  {% csrf_token %}
+  {% if form.errors %}<div role="alert">Your note has not been saved. Check the message below.</div>{% endif %}
+  {{ form.as_p }}
+  <div class="actions">
+    <button>{% if note %}Save changes{% else %}Save note{% endif %}</button>
+    {% if note %}<a href="{% url 'note' note.id %}">Open current note</a>{% else %}<a href="{% url 'index' %}">Cancel</a>{% endif %}
+  </div>
+</form>
+{% endblock %}

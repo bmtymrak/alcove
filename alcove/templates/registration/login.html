@@ -1,0 +1,15 @@
+{% extends "alcove/base.html" %}
+{% block title %}Sign in · Alcove{% endblock %}
+{% block content %}
+<section class="panel login">
+  <p class="eyebrow">YOUR PRIVATE COLLECTION</p>
+  <h1>A quiet place for your thoughts.</h1>
+  <p>Sign in to return to your reading notes.</p>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button>Sign in</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,24 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; color: #26362d; background: #f6f5ef; line-height: 1.6; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+header { max-width: 58rem; margin: auto; padding: 1.25rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid #d7dcd3; }
+.brand { font-family: Georgia, serif; font-size: 1.7rem; text-decoration: none; font-weight: bold; }
+nav { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+nav form { margin: 0; }
+main { max-width: 46rem; padding: 2.5rem 1.5rem; margin: auto; }
+h1 { font-family: Georgia, serif; font-weight: normal; font-size: clamp(2rem, 5vw, 2.7rem); line-height: 1.2; }
+a { color: #315c40; text-underline-offset: 0.2em; }
+.eyebrow { font-size: 0.75rem; letter-spacing: 0.13em; color: #536549; }
+.panel { background: #fffef9; border: 1px solid #d7dcd3; border-radius: 0.65rem; padding: 1.5rem; margin: 1.25rem 0; overflow-wrap: anywhere; }
+.login { max-width: 32rem; margin: 2rem auto; }
+label { display: block; font-weight: 600; margin: 1rem 0 0.5rem; }
+input, textarea { width: 100%; font: inherit; color: inherit; border: 1px solid #7a8978; border-radius: 0.3rem; padding: 0.7rem; background: white; }
+textarea { min-height: 12rem; resize: vertical; }
+button, .button { display: inline-block; cursor: pointer; font: inherit; font-weight: 600; background: #315c40; color: white; border: 1px solid #315c40; border-radius: 0.3rem; padding: 0.65rem 1rem; text-decoration: none; min-height: 44px; }
+button.quiet { background: transparent; color: #315c40; }
+:focus-visible { outline: 3px solid #9a640c; outline-offset: 3px; }
+.errorlist, .error { color: #9c2828; }
+.note-content { white-space: pre-wrap; overflow-wrap: anywhere; }
+.metadata { color: #536549; font-size: 0.85rem; }
+.actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 1.25rem; }
+@media (max-width: 480px) { header { padding: 1rem; align-items: flex-start; } main { padding: 1.5rem 1rem; } .panel { padding: 1rem; } nav { justify-content: flex-end; gap: 0.5rem; } }

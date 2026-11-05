@@ -1,0 +1,330 @@
+openapi: 3.1.0
+info:
+  title: Alcove API
+  version: 1.0.0
+  description: Private same-origin session API. Sign in at /login/ with CSRF. Send
+    the csrftoken cookie in X-CSRFToken on POST/PATCH. Notes use stable UUIDs and
+    UTC timestamps. See docs/api.md.
+paths:
+  /api/v1/notes/:
+    get:
+      operationId: notes_list
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page; 20 Notes.
+      tags:
+      - notes
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotePage'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+    post:
+      operationId: notes_capture
+      tags:
+      - notes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaptureRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
+  /api/v1/notes/{note_id}/:
+    get:
+      operationId: notes_read
+      parameters:
+      - in: path
+        name: note_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - notes
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+    patch:
+      operationId: notes_edit
+      parameters:
+      - in: path
+        name: note_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - notes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Stale revision; no change.
+components:
+  schemas:
+    CaptureRequest:
+      type: object
+      properties:
+        content:
+          $ref: '#/components/schemas/ContentRequest'
+      required:
+      - content
+    Content:
+      type: object
+      properties:
+        version:
+          $ref: '#/components/schemas/VersionEnum'
+        format:
+          $ref: '#/components/schemas/FormatEnum'
+        text:
+          type: string
+          maxLength: 100000
+          minLength: 1
+      required:
+      - format
+      - text
+      - version
+    ContentRequest:
+      type: object
+      properties:
+        version:
+          $ref: '#/components/schemas/VersionEnum'
+        format:
+          $ref: '#/components/schemas/FormatEnum'
+        text:
+          type: string
+          minLength: 1
+          maxLength: 100000
+      required:
+      - format
+      - text
+      - version
+    EditRequest:
+      type: object
+      properties:
+        content:
+          $ref: '#/components/schemas/ContentRequest'
+        revision:
+          type: integer
+          maximum: 9223372036854775806
+          minimum: 1
+          format: int64
+      required:
+      - content
+      - revision
+    Error:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+      required:
+      - error
+    ErrorDetail:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        fields:
+          type: object
+          additionalProperties: {}
+      required:
+      - code
+      - fields
+      - message
+    FormatEnum:
+      enum:
+      - plain-text
+      type: string
+      description: '* `plain-text` - plain-text'
+    Note:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        content:
+          $ref: '#/components/schemas/Content'
+        plain_text:
+          type: string
+        captured_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        revision:
+          type: integer
+          minimum: 1
+      required:
+      - captured_at
+      - content
+      - id
+      - plain_text
+      - revision
+      - updated_at
+    NotePage:
+      type: object
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Note'
+      required:
+      - count
+      - page
+      - page_size
+      - results
+    VersionEnum:
+      enum:
+      - 1
+      type: integer
+      description: '* `1` - 1'
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid

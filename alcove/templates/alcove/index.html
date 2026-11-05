@@ -1,0 +1,16 @@
+{% extends "alcove/base.html" %}
+{% block content %}
+<p class="eyebrow">YOUR PRIVATE COLLECTION</p>
+<h1>Notes</h1>
+<a class="button" href="{% url 'capture' %}">Capture a note</a>
+{% for note in notes %}<article class="panel">
+<p class="note-content">{{ note.plain_text }}</p>
+<a href="{% url 'note' note.id %}">Open note <span class="metadata">· {{ note.captured_at|date:"M j, Y, H:i" }} UTC</span></a>
+</article>
+{% empty %}<p>No notes yet. Start with a thought from your reading.</p>{% endfor %}
+<nav aria-label="Note pages">
+{% if notes.has_previous %}<a href="?page={{ notes.previous_page_number }}">Previous</a>{% endif %}
+<span>Page {{ notes.number }} of {{ notes.paginator.num_pages }}</span>
+{% if notes.has_next %}<a href="?page={{ notes.next_page_number }}">Next</a>{% endif %}
+</nav>
+{% endblock %}
