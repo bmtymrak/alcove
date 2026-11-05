@@ -65,11 +65,68 @@ Edit revisions must be integers between 1 and 9223372036854775806, leaving room
 for the increment in SQLite storage. Out-of-range preconditions are field errors
 (`400`) and do not change the Note.
 
-Content preserves whitespace, Unicode, and line breaks. Blank or whitespace-only
-content, null characters, unsupported formats/versions, and content over 100,000
-characters are rejected. HTML-looking input remains literal escaped text. Unknown
-request fields are rejected. Version 1 currently supports `plain-text` only;
-formatting will extend the content schema in a later slice.
+## Canonical Note content
+
+`content` is a complete versioned JSON document, never raw HTML. The limited
+open-source editor uses this representation for general and Book capture and
+for editing existing Notes:
+
+```json
+{
+  "version": 1,
+  "format": "tiptap",
+  "doc": {
+    "type": "doc",
+    "content": [
+      {"type": "blockquote", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "A quotation."}]}
+      ]},
+      {"type": "paragraph", "content": [
+        {"type": "text", "text": "My thought. ", "marks": [{"type": "italic"}]},
+        {"type": "text", "text": "Related reading", "marks": [
+          {"type": "link", "attrs": {"href": "https://example.org/reading"}}
+        ]}
+      ]}
+    ]
+  }
+}
+```
+
+The closed schema is recorded under `NoteContent` and its recursive components in
+OpenAPI. Allowed blocks are `paragraph`, `blockquote`, `bulletList`, and
+`orderedList`. The root `doc` and blockquotes contain one or more blocks. Lists
+contain one or more `listItem` nodes, each beginning with a paragraph and optionally
+followed by more blocks (including nested lists). Paragraphs may be empty and
+contain only `text` and `hardBreak` nodes. Text nodes need a nonempty string and
+optionally `marks`: `bold`, `italic`, or `link`, each at most once per node.
+Only link marks accept `attrs`, containing just `href`. Ordered lists optionally
+accept `attrs` containing just `start` (integer 1–2147483647; omitted means 1).
+All other node/mark attributes and unsupported properties, nodes, or formats are
+rejected, including images, headings, styles, event handlers, and raw HTML.
+
+Links must be absolute `http://` or `https://` addresses with a host and a valid
+nonzero port if present, at most 2,048 characters long, without whitespace, control
+characters, or backslashes. Relative URLs and other protocols, including
+`javascript:`, `data:`, `file:`, and `mailto:`, are rejected. Supported tags are
+rendered from validated content with all text and link attributes escaped; Notes
+never render submitted HTML. Text such as `<script>` remains literal text.
+
+`plain_text` is derived by concatenating inline text, translating `hardBreak` to
+a newline, and joining sibling blocks/list items with a newline, recursively.
+There are no bullets, numbering, or markup in this projection; link labels appear
+as text, without appending the URL. Whitespace and Unicode are preserved. The
+projection must contain non-whitespace text and be at most 100,000 characters.
+Documents with only empty paragraphs, list items, line breaks, or whitespace do
+not create Notes. Null characters and unpaired Unicode surrogates are rejected.
+Tiptap documents allow at most 10,000 nodes and depth 20 (root is depth 0).
+OpenAPI describes these additional semantic limits; they are enforced by the
+shared Note content module for both transports.
+
+Existing `{ "version": 1, "format": "plain-text", "text": "..." }` documents remain
+accepted without migration and are returned unchanged until edited. They use the
+same text/length/nonempty rules. The browser converts them to paragraphs on save,
+retaining their text. No Note requires a title or type, and quotations and
+commentary can coexist in one document. Unknown request fields are rejected.
 
 List results have `count`, `page`, `page_size` (20), and `results`. Pages start at 1;
 an empty Collection has an empty page 1. Invalid/out-of-range pages return `404`.
@@ -113,7 +170,25 @@ Save and add another opens a fresh capture with the saved source selected.
 General capture at `/notes/new/` offers the same source selector and repeat action.
 Clearing the selection makes the next capture standalone.
 
-The HTML capture/edit forms retain submitted input on validation and revision
-errors. This slice uses explicit saves; it makes no draft-recovery or autosave
-promise. Authentication redirects and HTML form errors are specific to the HTML
-delivery path; JSON errors use the envelope above for matched API operations.
+Content validation returns `400` with `error.code = "invalid"` and
+`error.fields.content` as an array of messages, for example:
+
+```json
+{"error":{"code":"invalid","message":"Use only supported Note formatting and http/https links.","fields":{"content":["Use only supported Note formatting and http/https links."]}}}
+```
+
+An empty document returns `"Write something before saving."`. Invalid content
+never creates a Note or changes existing content, revision, or timestamps.
+
+Enhanced forms send the canonical document through the JSON API with CSRF. They
+keep formatted input on validation, conflict, and network errors, show saving or
+failure status, and navigate only after a confirmed successful response. Saves
+are explicit. Draft recovery across navigation/reload and autosave are not yet
+delivered. Native HTML form posts accept the same document serialized in the
+`content_document` field, with the same validation rules; an empty/omitted field
+uses legacy plain text from `content`. Invalid JSON and rejected documents remain
+in the recovery field, escaped, instead of being stripped or replaced. The plain
+text field for an existing formatted Note is read-only without the editor, so a
+source-only edit preserves the canonical document. Authentication redirects and
+HTML form errors are specific to the HTML path; JSON errors use the envelope
+above for matched API operations.

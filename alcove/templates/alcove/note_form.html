@@ -1,18 +1,60 @@
 {% extends "alcove/base.html" %}
+{% load static %}
 {% block title %}{% if note %}Edit note{% else %}Capture a note{% endif %} · Alcove{% endblock %}
 {% block content %}
 <a href="{% url 'notes' %}">← All notes</a>
 <h1>{% if note %}Edit note{% else %}Capture a note{% endif %}</h1>
 {% if source_book %}<p>Capturing from <a href="{% url 'book' source_book.id %}">{{ source_book.title }}</a></p>{% endif %}
 <p id="content-help">A thought, a quotation, a sentence. No title or book needed.</p>
-<form method="post" class="panel">
+<form method="post" class="panel" data-note-editor data-api-url="{% if note %}{% url 'api-note' note.id %}{% else %}{% url 'api-notes' %}{% endif %}" data-rejected="{% if form.document_rejected or form.content_document.errors %}true{% else %}false{% endif %}">
   {% csrf_token %}
   {% if form.errors %}<div role="alert">Your note has not been saved. Check the message below.</div>{% endif %}
-  {{ form.as_p }}
+  {{ form.non_field_errors }}
+  {{ form.revision }}
+  {{ form.content.errors }}
+  <label id="note-content-label" for="note-editor">Your note</label>
+  <div id="formatting-tools" class="formatting-tools" role="group" aria-label="Note formatting" hidden>
+    <button type="button" data-command="paragraph" data-format="paragraph">Paragraph</button>
+    <button type="button" data-command="bold" data-format="bold">Bold</button>
+    <button type="button" data-command="italic" data-format="italic">Italic</button>
+    <button type="button" data-command="bulletList" data-format="bulletList">Bulleted list</button>
+    <button type="button" data-command="orderedList" data-format="orderedList">Numbered list</button>
+    <button type="button" data-command="blockquote" data-format="blockquote">Quotation</button>
+    <button type="button" id="website-link">Website link</button>
+    <button type="button" data-command="undo">Undo</button>
+    <button type="button" data-command="redo">Redo</button>
+  </div>
+  <div id="editor-host" hidden></div>
+  <p id="editor-error" class="error" role="alert" hidden></p>
+  <p id="save-status" role="status" aria-live="polite"></p>
+  <noscript><label for="id_content">Plain text</label></noscript>
+  {{ form.content }}
+  <details id="document-recovery"{% if form.content_document.errors or form.document_rejected %} open{% endif %}>
+    <summary>Formatted document recovery</summary>
+    <p>Without the editor, use plain text for a new Note. For a formatted Note, edit its JSON document here. Clear this field to save the plain text instead.</p>
+    {{ form.content_document.errors }}
+    {{ form.content_document.label_tag }}{{ form.content_document }}
+  </details>
+  {{ form.book.errors }}
+  {{ form.book.label_tag }}{{ form.book }}
   <div class="actions">
     <button>{% if note %}Save changes{% else %}Save note{% endif %}</button>
     {% if not note %}<button name="add_another" value="1">Save and add another</button>{% endif %}
     {% if note %}<a href="{% url 'note' note.id %}">Open current note</a>{% else %}<a href="{% url 'notes' %}">Cancel</a>{% endif %}
   </div>
 </form>
+<dialog id="link-dialog">
+  <form>
+    <h2>Website link</h2>
+    <label for="website-address">Website address</label>
+    <input id="website-address" type="text" inputmode="url" autocomplete="url" placeholder="https://example.org/" maxlength="2048">
+    <p role="alert" class="error" hidden>Use a complete http:// or https:// website address.</p>
+    <div class="actions">
+      <button>Apply link</button>
+      <button type="button" data-remove-link>Remove link</button>
+      <button type="button" data-cancel-link>Cancel</button>
+    </div>
+  </form>
+</dialog>
+<script src="{% static 'alcove/editor.js' %}" defer></script>
 {% endblock %}

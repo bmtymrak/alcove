@@ -1,0 +1,17 @@
+{
+  "name": "alcove-editor",
+  "private": true,
+  "scripts": {
+    "build": "node frontend/build.mjs"
+  },
+  "dependencies": {
+    "@tiptap/core": "3.33.0",
+    "@tiptap/extension-link": "3.33.0",
+    "@tiptap/extension-list": "3.33.0",
+    "@tiptap/pm": "3.33.0",
+    "@tiptap/starter-kit": "3.33.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

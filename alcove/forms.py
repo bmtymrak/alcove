@@ -1,12 +1,21 @@
+import json
 from typing import Any
 from uuid import UUID
 
 from django import forms
 
-from .notes import MAX_CONTENT_LENGTH, MAX_EXPECTED_REVISION
+from .notes import (
+    MAX_CONTENT_LENGTH,
+    MAX_EXPECTED_REVISION,
+    NoteError,
+    plain_text_content,
+    validated_content,
+)
 
 
 class CaptureForm(forms.Form):
+    document_rejected = False
+
     def __init__(
         self, *args: Any, book_options: list[tuple[str, str]], **kwargs: Any
     ) -> None:
@@ -18,6 +27,34 @@ class CaptureForm(forms.Form):
             empty_value=None,
             choices=[("", "No source book"), *book_options],
         )
+        if self.initial.get("content_document"):
+            self.fields["content"].widget.attrs["readonly"] = True
+
+    def clean(self) -> dict[str, Any]:
+        data = super().clean() or {}
+        raw = data.get("content_document", "")
+        if raw:
+            try:
+                data["document"] = json.loads(raw)
+            except (ValueError, RecursionError):
+                self.add_error("content_document", "Enter a valid Note JSON document.")
+                return data
+        else:
+            data["document"] = plain_text_content(data.get("content", ""))
+        try:
+            data["document"] = validated_content(data["document"])[0]
+        except NoteError as exc:
+            self.add_error("content", str(exc))
+            self.document_rejected = str(exc) != "Write something before saving."
+        return data
+
+    content_document = forms.CharField(
+        label="Formatted content (JSON)",
+        required=False,
+        strip=False,
+        widget=forms.Textarea,
+        help_text="Retained document for recovery. Leave empty to use plain text.",
+    )
 
     content = forms.CharField(
         label="Your note",

@@ -1,5 +1,6 @@
+{% load note_content %}
 {% for note in notes %}<article class="panel">
-<p class="note-content">{{ note.plain_text }}</p>
+<div class="note-content">{{ note.content|render_note }}</div>
 <a href="{% url 'note' note.id %}">Open note <span class="metadata">· {{ note.captured_at|date:"M j, Y, H:i" }} UTC</span></a>
 </article>
 {% empty %}<p>No notes yet. Start with a thought from your reading.</p>{% endfor %}

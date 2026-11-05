@@ -19,7 +19,19 @@ button, .button { display: inline-block; cursor: pointer; font: inherit; font-we
 button.quiet { background: transparent; color: #315c40; }
 :focus-visible { outline: 3px solid #9a640c; outline-offset: 3px; }
 .errorlist, .error { color: #9c2828; }
-.note-content { white-space: pre-wrap; overflow-wrap: anywhere; }
+.note-content { overflow-wrap: anywhere; }
+.note-content p { white-space: pre-wrap; }
 .metadata { color: #536549; font-size: 0.85rem; }
 .actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 1.25rem; }
 @media (max-width: 480px) { header { padding: 1rem; align-items: flex-start; } main { padding: 1.5rem 1rem; } .panel { padding: 1rem; } nav { justify-content: flex-end; gap: 0.5rem; } }
+
+[hidden] { display: none !important; }
+.formatting-tools { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
+.formatting-tools button { padding: 0.4rem 0.65rem; background: transparent; color: #315c40; }
+.formatting-tools button[aria-pressed="true"] { background: #315c40; color: white; }
+.tiptap { min-height: 14rem; border: 1px solid #7a8978; border-radius: 0.3rem; padding: 0.7rem; background: white; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tiptap p { margin: 0.6rem 0; }
+blockquote { border-left: 3px solid #7a8978; margin: 1rem 0; padding-left: 1rem; }
+ul, ol { padding-left: 1.7rem; }
+dialog { max-width: min(32rem, calc(100% - 2rem)); border: 1px solid #7a8978; border-radius: 0.65rem; color: inherit; }
+dialog::backdrop { background: #26362d66; }

@@ -1,5 +1,6 @@
 from typing import Any
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from . import notes
@@ -16,26 +17,19 @@ class StrictSerializer(serializers.Serializer):
         return super().to_internal_value(data)
 
 
-class ContentSerializer(serializers.Serializer):
-    version = serializers.ChoiceField(choices=[1])
-    format = serializers.ChoiceField(choices=["plain-text"])
-    text = serializers.CharField(
-        min_length=1,
-        max_length=notes.MAX_CONTENT_LENGTH,
-        trim_whitespace=False,
-    )
-
+@extend_schema_field({"$ref": "#/components/schemas/NoteContent"})
+class ContentField(serializers.JSONField):
     def to_internal_value(self, data: Any) -> dict[str, Any]:
-        return dict(notes.validated_content(data))
+        return notes.validated_content(data)[0]
 
 
 class CaptureSerializer(StrictSerializer):
-    content = ContentSerializer()
+    content = ContentField()
     book = serializers.UUIDField(required=False, allow_null=True)
 
 
 class EditSerializer(CaptureSerializer):
-    content = ContentSerializer(required=False)
+    content = ContentField(required=False)
     revision = serializers.IntegerField(
         min_value=1,
         max_value=notes.MAX_EXPECTED_REVISION,
@@ -44,7 +38,7 @@ class EditSerializer(CaptureSerializer):
 
 class NoteSerializer(serializers.Serializer):
     id = serializers.UUIDField()
-    content = ContentSerializer()
+    content = ContentField()
     book = serializers.UUIDField(source="book_id", allow_null=True)
     plain_text = serializers.CharField()
     captured_at = serializers.DateTimeField()

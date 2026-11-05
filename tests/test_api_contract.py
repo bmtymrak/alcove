@@ -159,3 +159,56 @@ def test_book_and_source_contracts_match_real_requests_and_responses(signed_in):
         },
     )
     validate_response(foreign_source, COLLECTION, "post", 400)
+
+
+def test_formatted_content_contract_matches_both_deliveries(signed_in):
+    from test_formatted_notes_http import paragraph, rich_document
+
+    payload = {
+        "content": rich_document(
+            {
+                "type": "blockquote",
+                "content": [paragraph("Quoted", [{"type": "italic"}])],
+            },
+            {
+                "type": "orderedList",
+                "attrs": {"start": 2},
+                "content": [
+                    {"type": "listItem", "content": [paragraph("An observation")]},
+                ],
+            },
+            paragraph(
+                "Website", [{"type": "link", "attrs": {"href": "http://example.org/"}}]
+            ),
+        ),
+    }
+    validate_request(payload, COLLECTION, "post")
+    response = json_request(signed_in, "post", COLLECTION, payload)
+    validate_response(response, COLLECTION, "post", 201)
+    path = response["Location"]
+    validate_response(signed_in.get(path), DETAIL, "get", 200)
+    validate_response(signed_in.get(COLLECTION), COLLECTION, "get", 200)
+    payload = {
+        "content": rich_document(paragraph("Revised", [{"type": "bold"}])),
+        "revision": 1,
+    }
+    validate_request(payload, DETAIL, "patch")
+    validate_response(
+        json_request(signed_in, "patch", path, payload), DETAIL, "patch", 200
+    )
+    invalid = json_request(
+        signed_in,
+        "patch",
+        path,
+        {
+            "content": rich_document(
+                paragraph(
+                    "Unsafe",
+                    [{"type": "link", "attrs": {"href": "javascript:alert(1)"}}],
+                )
+            ),
+            "revision": 2,
+        },
+    )
+    validate_response(invalid, DETAIL, "patch", 400)
+    assert set(invalid.json()["error"]["fields"]) == {"content"}

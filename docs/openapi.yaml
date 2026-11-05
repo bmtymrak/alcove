@@ -490,7 +490,7 @@ components:
       type: object
       properties:
         content:
-          $ref: '#/components/schemas/ContentRequest'
+          $ref: '#/components/schemas/NoteContent'
         book:
           type:
           - string
@@ -498,41 +498,11 @@ components:
           format: uuid
       required:
       - content
-    Content:
-      type: object
-      properties:
-        version:
-          $ref: '#/components/schemas/VersionEnum'
-        format:
-          $ref: '#/components/schemas/FormatEnum'
-        text:
-          type: string
-          maxLength: 100000
-          minLength: 1
-      required:
-      - format
-      - text
-      - version
-    ContentRequest:
-      type: object
-      properties:
-        version:
-          $ref: '#/components/schemas/VersionEnum'
-        format:
-          $ref: '#/components/schemas/FormatEnum'
-        text:
-          type: string
-          minLength: 1
-          maxLength: 100000
-      required:
-      - format
-      - text
-      - version
     EditRequest:
       type: object
       properties:
         content:
-          $ref: '#/components/schemas/ContentRequest'
+          $ref: '#/components/schemas/NoteContent'
         book:
           type:
           - string
@@ -566,11 +536,6 @@ components:
       - code
       - fields
       - message
-    FormatEnum:
-      enum:
-      - plain-text
-      type: string
-      description: '* `plain-text` - plain-text'
     Note:
       type: object
       properties:
@@ -578,7 +543,7 @@ components:
           type: string
           format: uuid
         content:
-          $ref: '#/components/schemas/Content'
+          $ref: '#/components/schemas/NoteContent'
         book:
           type:
           - string
@@ -603,6 +568,183 @@ components:
       - plain_text
       - revision
       - updated_at
+    NoteBlock:
+      oneOf:
+      - $ref: '#/components/schemas/NoteParagraph'
+      - $ref: '#/components/schemas/NoteBlockquote'
+      - $ref: '#/components/schemas/NoteBulletList'
+      - $ref: '#/components/schemas/NoteOrderedList'
+    NoteBlockquote:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          const: blockquote
+        content:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/NoteBlock'
+      required:
+      - type
+      - content
+    NoteBulletList:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          const: bulletList
+        content:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/NoteListItem'
+      required:
+      - type
+      - content
+    NoteContent:
+      description: Canonical version 1 Note content. Tiptap documents support paragraphs,
+        bold/italic text, lists, quotations, hard breaks and absolute http/https links
+        only. Legacy plain-text documents remain supported. Runtime validation additionally
+        requires non-whitespace text, at most 100,000 projected characters, 10,000
+        nodes, and depth 20 (root depth 0). Null characters and unpaired surrogates
+        are forbidden. Text marks must have distinct types. See docs/api.md for projection
+        and errors.
+      oneOf:
+      - type: object
+        additionalProperties: false
+        properties:
+          version:
+            type: integer
+            const: 1
+          format:
+            type: string
+            const: plain-text
+          text:
+            type: string
+            minLength: 1
+            maxLength: 100000
+        required:
+        - version
+        - format
+        - text
+      - type: object
+        additionalProperties: false
+        properties:
+          version:
+            type: integer
+            const: 1
+          format:
+            type: string
+            const: tiptap
+          doc:
+            $ref: '#/components/schemas/NoteDocument'
+        required:
+        - version
+        - format
+        - doc
+    NoteDocument:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          const: doc
+        content:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/NoteBlock'
+      required:
+      - type
+      - content
+    NoteHardBreak:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          const: hardBreak
+      required:
+      - type
+    NoteListItem:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          const: listItem
+        content:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/NoteBlock'
+          prefixItems:
+          - $ref: '#/components/schemas/NoteParagraph'
+          description: A paragraph followed by zero or more supported blocks.
+      required:
+      - type
+      - content
+    NoteMark:
+      oneOf:
+      - type: object
+        additionalProperties: false
+        properties:
+          type:
+            type: string
+            oneOf:
+            - const: bold
+            - const: italic
+        required:
+        - type
+      - type: object
+        additionalProperties: false
+        properties:
+          type:
+            type: string
+            const: link
+          attrs:
+            type: object
+            additionalProperties: false
+            properties:
+              href:
+                type: string
+                maxLength: 2048
+                pattern: ^[hH][tT][tT][pP][sS]?://[^\s\\]+$
+                description: Absolute http/https URL with a host and valid port; no
+                  whitespace, control characters or backslashes.
+            required:
+            - href
+        required:
+        - type
+        - attrs
+    NoteOrderedList:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          const: orderedList
+        content:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/NoteListItem'
+        attrs:
+          type: object
+          additionalProperties: false
+          properties:
+            start:
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+          required:
+          - start
+      required:
+      - type
+      - content
     NotePage:
       type: object
       properties:
@@ -623,11 +765,41 @@ components:
       - page
       - page_size
       - results
-    VersionEnum:
-      enum:
-      - 1
-      type: integer
-      description: '* `1` - 1'
+    NoteParagraph:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          const: paragraph
+        content:
+          type: array
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/NoteText'
+            - $ref: '#/components/schemas/NoteHardBreak'
+      required:
+      - type
+    NoteText:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          const: text
+        text:
+          type: string
+          minLength: 1
+          maxLength: 100000
+        marks:
+          type: array
+          maxItems: 3
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/NoteMark'
+      required:
+      - type
+      - text
   securitySchemes:
     cookieAuth:
       type: apiKey

@@ -11,3 +11,4 @@ data/
 staticfiles/
 test-results/
 playwright-report/
+node_modules/

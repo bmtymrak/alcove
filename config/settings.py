@@ -3,6 +3,8 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
+from alcove.content_schema import CONTENT_COMPONENTS
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEBUG = os.environ.get("ALCOVE_DEBUG", "1") == "1"
 SECRET_KEY = os.environ.get("ALCOVE_SECRET_KEY", "")
@@ -86,6 +88,7 @@ REST_FRAMEWORK = {
 }
 SPECTACULAR_SETTINGS = {
     "TITLE": "Alcove API",
+    "APPEND_COMPONENTS": {"schemas": CONTENT_COMPONENTS},
     "VERSION": "1.0.0",
     "OAS_VERSION": "3.1.0",
     "SERVE_INCLUDE_SCHEMA": False,

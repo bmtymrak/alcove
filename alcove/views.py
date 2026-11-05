@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
@@ -36,10 +37,11 @@ def capture(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse:
         try:
             note = notes.capture(
                 collection,
-                notes.plain_text_content(form.cleaned_data["content"]),
+                form.cleaned_data["document"],
                 book=form.cleaned_data["book"],
             )
         except notes.NoteError as exc:
+            form.document_rejected = str(exc) != "Write something before saving."
             for field, messages in exc.fields.items():
                 for message in messages:
                     form.add_error(field, message)
@@ -73,6 +75,9 @@ def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
         request.POST if request.method == "POST" else None,
         initial={
             "content": note.plain_text,
+            "content_document": (
+                json.dumps(note.content) if note.content["format"] == "tiptap" else ""
+            ),
             "revision": note.revision,
             "book": note.book_id,
         },
@@ -84,11 +89,14 @@ def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
             notes.edit(
                 collection,
                 note_id,
-                notes.plain_text_content(form.cleaned_data["content"]),
+                form.cleaned_data["document"],
                 form.cleaned_data["revision"],
                 book=form.cleaned_data["book"],
             )
         except notes.NoteError as exc:
+            form.document_rejected = exc.status == 400 and str(exc) != (
+                "Write something before saving."
+            )
             form.add_error(None, str(exc))
             status = exc.status
         else:
