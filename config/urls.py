@@ -27,6 +27,18 @@ urlpatterns = [
     path("topics/", views.topic_tree, name="topic-tree"),
     path("topics/<uuid:topic_id>/", views.topic_detail, name="topic"),
     path("topics/<uuid:topic_id>/rename/", views.topic_rename, name="topic-rename"),
+    path(
+        "topics/<uuid:topic_id>/move/",
+        views.topic_reorganize,
+        {"operation": "move"},
+        name="topic-move",
+    ),
+    path(
+        "topics/<uuid:topic_id>/remove/",
+        views.topic_reorganize,
+        {"operation": "remove"},
+        name="topic-remove",
+    ),
     path("api/v1/topics/", api.TopicsView.as_view(), name="api-topics"),
     path(
         "api/v1/topics/<uuid:topic_id>/notes/",
@@ -34,6 +46,26 @@ urlpatterns = [
         name="api-topic-notes",
     ),
     path("api/v1/topics/<uuid:topic_id>/", api.TopicView.as_view(), name="api-topic"),
+    path(
+        "api/v1/topics/<uuid:topic_id>/move/preview/",
+        api.TopicMovePreviewView.as_view(),
+        name="api-topic-move-preview",
+    ),
+    path(
+        "api/v1/topics/<uuid:topic_id>/move/",
+        api.TopicMoveView.as_view(),
+        name="api-topic-move",
+    ),
+    path(
+        "api/v1/topics/<uuid:topic_id>/remove/preview/",
+        api.TopicRemovalPreviewView.as_view(),
+        name="api-topic-removal-preview",
+    ),
+    path(
+        "api/v1/topics/<uuid:topic_id>/remove/",
+        api.TopicRemovalView.as_view(),
+        name="api-topic-remove",
+    ),
     path("api/v1/books/", api.BooksView.as_view(), name="api-books"),
     path("api/v1/books/<uuid:book_id>/", api.BookView.as_view(), name="api-book"),
     path(

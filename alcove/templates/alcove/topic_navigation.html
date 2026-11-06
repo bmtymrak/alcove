@@ -2,7 +2,11 @@
   <ul>
     {% for entry, has_children, close_levels in rows %}
     <li><a href="{% url 'topic' entry.id %}"{% if entry.id == current.id %} aria-current="location"{% endif %}>{{ entry.full_path }}</a>
-      {% if manage %}<a href="{% url 'topic-rename' entry.id %}" aria-label="Rename {{ entry.full_path }}">Rename</a>{% endif %}
+      {% if manage %}
+      <a href="{% url 'topic-rename' entry.id %}" aria-label="Rename {{ entry.full_path }}">Rename</a>
+      <a href="{% url 'topic-move' entry.id %}" aria-label="Move {{ entry.full_path }}">Move</a>
+      <a href="{% url 'topic-remove' entry.id %}" aria-label="Remove {{ entry.full_path }}">Remove</a>
+      {% endif %}
       {% if has_children %}<ul>{% else %}</li>{% endif %}
       {% for level in close_levels %}</ul></li>{% endfor %}
     {% empty %}<li>No Topics yet.</li>{% endfor %}

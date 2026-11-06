@@ -844,6 +844,126 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: Send application/json.
+  /api/v1/topics/{topic_id}/move/:
+    post:
+      operationId: topics_move
+      parameters:
+      - in: path
+        name: topic_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - topics
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TopicMoveRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Topic'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The Topic preview is stale.
+  /api/v1/topics/{topic_id}/move/preview/:
+    post:
+      operationId: topics_preview_move
+      parameters:
+      - in: path
+        name: topic_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - topics
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TopicMoveDestinationRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicPreview'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
   /api/v1/topics/{topic_id}/notes/:
     get:
       operationId: topics_notes
@@ -897,6 +1017,122 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: Method not allowed.
+  /api/v1/topics/{topic_id}/remove/:
+    post:
+      operationId: topics_remove
+      parameters:
+      - in: path
+        name: topic_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - topics
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TopicRemovalRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The Topic preview is stale.
+  /api/v1/topics/{topic_id}/remove/preview/:
+    post:
+      operationId: topics_preview_removal
+      parameters:
+      - in: path
+        name: topic_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - topics
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TopicRemovalModeRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicPreview'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
 components:
   schemas:
     ActionEnum:
@@ -1165,6 +1401,14 @@ components:
       - code
       - fields
       - message
+    ModeEnum:
+      enum:
+      - promote_children
+      - remove_subtree
+      type: string
+      description: |-
+        * `promote_children` - promote_children
+        * `remove_subtree` - remove_subtree
     Note:
       type: object
       properties:
@@ -1460,6 +1704,14 @@ components:
       required:
       - type
       - text
+    ResolutionEnum:
+      enum:
+      - keep_ancestors
+      - keep_descendants
+      type: string
+      description: |-
+        * `keep_ancestors` - keep_ancestors
+        * `keep_descendants` - keep_descendants
     Topic:
       type: object
       properties:
@@ -1492,6 +1744,26 @@ components:
       - label
       - parent
       - path
+    TopicAssignmentImpact:
+      type: object
+      properties:
+        note:
+          type: string
+          format: uuid
+        note_excerpt:
+          type: string
+        topic:
+          $ref: '#/components/schemas/Topic'
+        ancestor:
+          oneOf:
+          - $ref: '#/components/schemas/Topic'
+          - type: 'null'
+          description: Conflicting ancestor assignment, if any.
+      required:
+      - ancestor
+      - note
+      - note_excerpt
+      - topic
     TopicChangeRequest:
       type: object
       properties:
@@ -1517,6 +1789,94 @@ components:
           format: uuid
       required:
       - label
+    TopicImpact:
+      type: object
+      properties:
+        topic:
+          $ref: '#/components/schemas/Topic'
+        new_path:
+          type:
+          - string
+          - 'null'
+          description: Updated full path, or null for a removed Topic.
+      required:
+      - new_path
+      - topic
+    TopicMoveDestinationRequest:
+      type: object
+      properties:
+        parent:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: New parent UUID or null for root.
+      required:
+      - parent
+    TopicMoveRequest:
+      type: object
+      properties:
+        parent:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: New parent UUID or null for root.
+        confirmation:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: ^[0-9a-f]{64}$
+        resolution:
+          allOf:
+          - $ref: '#/components/schemas/ResolutionEnum'
+          description: |-
+            Required when the preview lists conflicting assignments.
+
+            * `keep_ancestors` - keep_ancestors
+            * `keep_descendants` - keep_descendants
+      required:
+      - confirmation
+      - parent
+    TopicPreview:
+      type: object
+      properties:
+        topics:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopicImpact'
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopicAssignmentImpact'
+        confirmation:
+          type: string
+          description: Pass this token with the same destination or removal mode to
+            apply.
+      required:
+      - assignments
+      - confirmation
+      - topics
+    TopicRemovalModeRequest:
+      type: object
+      properties:
+        mode:
+          $ref: '#/components/schemas/ModeEnum'
+      required:
+      - mode
+    TopicRemovalRequest:
+      type: object
+      properties:
+        mode:
+          $ref: '#/components/schemas/ModeEnum'
+        confirmation:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: ^[0-9a-f]{64}$
+      required:
+      - confirmation
+      - mode
     TopicRenameRequest:
       type: object
       properties:

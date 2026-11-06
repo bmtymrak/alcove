@@ -29,6 +29,10 @@ checks schema drift and validates real request/response examples against it.
 | Read a Topic | `GET /api/v1/topics/{uuid}/` | `200` |
 | Read a Topic's Notes | `GET /api/v1/topics/{uuid}/notes/?mode=branch&page=1` | `200` |
 | Rename a Topic | `PATCH /api/v1/topics/{uuid}/` | `200` |
+| Preview a Topic move | `POST /api/v1/topics/{uuid}/move/preview/` | `200`, with a confirmation token |
+| Move a Topic | `POST /api/v1/topics/{uuid}/move/` | `200`, with the updated Topic |
+| Preview a Topic removal | `POST /api/v1/topics/{uuid}/remove/preview/` | `200`, with a confirmation token |
+| Remove a Topic | `POST /api/v1/topics/{uuid}/remove/` | `204` |
 | List Notes | `GET /api/v1/notes/?page=1` | `200` |
 | Capture a Note | `POST /api/v1/notes/` | `201` on creation or `200` on replay, both with a relative `Location` header |
 | Read a Note | `GET /api/v1/notes/{uuid}/` | `200` |
@@ -153,10 +157,40 @@ Collection. An invalid operation rejects the entire save, including content,
 source, and revision changes. The response field `topics` is an array of
 explicitly assigned Topics in tree order, including their full paths.
 
-The signed-in Topic tree at `/topics/` provides create and rename forms. The
+The signed-in Topic tree at `/topics/` provides create, rename, move, and removal forms. The
 Note editor offers full-path suggestions and retains selections in capture and
 edit drafts. The native HTML forms accept explicit assignment and unassignment
 selections and apply unassignments first.
+
+### Move and remove Topics
+
+For a move, send `{"parent": "<uuid>"}` or `{"parent": null}` to move to the
+root. The destination must be in the same Collection and outside the moved
+branch. Sibling labels must remain distinct.
+
+For removal, send `{"mode": "promote_children"}` to move direct children to the
+removed Topic's parent or to the root if it has no parent. Their descendants
+move with them. Sibling label collisions block promotion. Use
+`{"mode": "remove_subtree"}` to remove the Topic and all its descendants.
+
+Preview responses list affected `topics` with their current representation and
+`new_path`. A null `new_path` marks a Topic for removal. Each affected
+assignment includes a `note` UUID, a short `note_excerpt`, and its assigned
+`topic`. Move previews pair each conflicting descendant assignment with its
+`ancestor` assignment. Removal previews list the assignments to clear.
+
+Apply by repeating the destination or removal mode with the preview's
+`confirmation` token. If the move preview lists conflicts, also send
+`"resolution": "keep_ancestors"` or `"resolution": "keep_descendants"`.
+That choice applies to all listed conflicts. Apply revalidates the operation and
+returns `409 stale_preview` if the valid operation now has a different preview.
+Fetch a fresh preview before retrying. Invalid changes return `400`. Changes
+to the hierarchy and assignments commit together.
+
+Removing a Topic clears its assignments and preserves the Notes and their
+source details. A Note whose assignments are cleared advances its revision so
+an open editor can review the change before saving a stale draft. Topic paths
+in browsing and suggestions reflect the new hierarchy on the next read.
 
 ## Canonical Note content
 

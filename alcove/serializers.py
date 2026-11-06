@@ -248,3 +248,50 @@ class TopicRenameSerializer(StrictSerializer):
 
 class TopicCreateSerializer(TopicRenameSerializer):
     parent = StrictUUIDField(required=False, allow_null=True)  # type: ignore[assignment]
+
+
+class TopicMoveDestinationSerializer(StrictSerializer):
+    parent = StrictUUIDField(  # type: ignore[assignment]
+        allow_null=True, help_text="New parent UUID or null for root."
+    )
+
+
+class TopicMoveSerializer(TopicMoveDestinationSerializer):
+    confirmation = serializers.RegexField(r"^[0-9a-f]{64}$", max_length=64)
+    resolution = serializers.ChoiceField(
+        choices=list(topics.MOVE_RESOLUTIONS),
+        required=False,
+        help_text="Required when the preview lists conflicting assignments.",
+    )
+
+
+class TopicRemovalModeSerializer(StrictSerializer):
+    mode = serializers.ChoiceField(choices=list(topics.REMOVAL_MODES))
+
+
+class TopicRemovalSerializer(TopicRemovalModeSerializer):
+    confirmation = serializers.RegexField(r"^[0-9a-f]{64}$", max_length=64)
+
+
+class TopicImpactSerializer(serializers.Serializer):
+    topic = TopicSerializer()
+    new_path = serializers.CharField(
+        allow_null=True, help_text="Updated full path, or null for a removed Topic."
+    )
+
+
+class TopicAssignmentImpactSerializer(serializers.Serializer):
+    note = serializers.UUIDField()
+    note_excerpt = serializers.CharField()
+    topic = TopicSerializer()
+    ancestor = TopicSerializer(
+        allow_null=True, help_text="Conflicting ancestor assignment, if any."
+    )
+
+
+class TopicPreviewSerializer(serializers.Serializer):
+    topics = TopicImpactSerializer(many=True)
+    assignments = TopicAssignmentImpactSerializer(many=True)
+    confirmation = serializers.CharField(
+        help_text="Pass this token with the same destination or removal mode to apply."
+    )

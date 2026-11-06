@@ -771,3 +771,113 @@ def test_browse_topic_modes_and_autosave_a_grouped_note(page, live_server):
     page.goto(book_url + "?order=topic")
     expect(arts_group.get_by_text("A revised observation.")).to_be_visible()
     expect(science_group.get_by_text("A revised observation.")).to_be_visible()
+
+
+def test_reorganize_topics_with_assignment_and_removal_previews(page, live_server):
+    sign_in(page, live_server)
+    page.get_by_role("link", name="Topics", exact=True).click()
+    for label, parent in [
+        ("Arts", None),
+        ("History", "Arts"),
+        ("Culture", None),
+    ]:
+        page.get_by_label("Label").fill(label)
+        if parent:
+            page.get_by_label("Parent").select_option(label=parent)
+        page.get_by_role("button", name="Create Topic").click()
+
+    page.goto(live_server.url + "/notes/new/")
+    page.get_by_label("Your note").fill("The original marginalia.")
+    picker = page.get_by_label("Find a Topic")
+    for query, path in [("History", "Arts › History"), ("Culture", "Culture")]:
+        picker.fill(query)
+        page.get_by_role("button", name=path, exact=True).click()
+    page.get_by_role("button", name="Save note", exact=True).click()
+    expect(page.get_by_role("link", name="Edit note", exact=True)).to_be_visible()
+    note_url = page.url
+
+    page.get_by_role("link", name="Topics", exact=True).click()
+    page.get_by_role("link", name="Move Arts", exact=True).click()
+    page.get_by_label("New parent").select_option(label="Culture")
+    page.get_by_role("button", name="Preview move").click()
+    preview = page.get_by_role("region", name="Preview")
+    expect(preview.get_by_role("link", name="The original marginalia.")).to_be_visible()
+    expect(preview.get_by_text("Culture › Arts › History")).to_be_visible()
+    preview.get_by_label("Conflicting assignments").select_option("keep_descendants")
+    preview.get_by_role("button", name="Apply move").click()
+    page.goto(note_url)
+    expect(page.get_by_role("list", name="Assigned Topics")).to_have_text(
+        "Culture › Arts › History"
+    )
+
+    page.get_by_role("link", name="Topics", exact=True).click()
+    page.get_by_role("link", name="Remove Culture", exact=True).click()
+    page.get_by_label("Child Topics").select_option("promote_children")
+    page.get_by_role("button", name="Preview removal").click()
+    expect(preview.get_by_text("Arts › History", exact=True)).to_be_visible()
+    preview.get_by_role("button", name="Confirm removal").click()
+    page.goto(note_url)
+    expect(page.get_by_role("list", name="Assigned Topics")).to_have_text(
+        "Arts › History"
+    )
+
+    page.get_by_role("link", name="Topics", exact=True).click()
+    page.get_by_role("link", name="Remove Arts", exact=True).click()
+    page.get_by_label("Child Topics").select_option("remove_subtree")
+    page.get_by_role("button", name="Preview removal").click()
+    expect(preview.get_by_role("link", name="The original marginalia.")).to_be_visible()
+    preview.get_by_role("button", name="Confirm removal").click()
+    page.goto(note_url)
+    expect(page.get_by_text("The original marginalia.", exact=True)).to_be_visible()
+    expect(page.get_by_role("list", name="Assigned Topics")).to_have_count(0)
+
+
+def test_autosave_refreshes_assignments_after_a_topic_move(page, live_server):
+    sign_in(page, live_server)
+    page.get_by_role("link", name="Topics", exact=True).click()
+    for label, parent in [("Arts", None), ("History", "Arts")]:
+        page.get_by_label("Label").fill(label)
+        if parent:
+            page.get_by_label("Parent").select_option(label=parent)
+        page.get_by_role("button", name="Create Topic").click()
+
+    page.goto(live_server.url + "/notes/new/")
+    page.get_by_label("Your note").fill("An observation.")
+    picker = page.get_by_label("Find a Topic")
+    picker.fill("History")
+    page.get_by_role("button", name="Arts › History", exact=True).click()
+    page.get_by_role("button", name="Save note", exact=True).click()
+    page.get_by_role("link", name="Edit note", exact=True).click()
+
+    manager = page.context.new_page()
+    manager.goto(live_server.url + "/topics/")
+    manager.get_by_role("link", name="Move Arts › History", exact=True).click()
+    manager.get_by_label("New parent").select_option(label="Root")
+    manager.get_by_role("button", name="Preview move").click()
+    manager.get_by_role("button", name="Apply move").click()
+    expect(manager.get_by_role("link", name="History", exact=True)).to_be_visible()
+    manager.close()
+
+    picker.fill("Arts")
+    page.get_by_role("button", name="Arts", exact=True).click()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    selected = page.get_by_role("list", name="Selected Topics")
+    expect(
+        selected.get_by_role("button", name="Remove Arts", exact=True)
+    ).to_be_visible()
+    expect(
+        selected.get_by_role("button", name="Remove History", exact=True)
+    ).to_be_visible()
+
+    page.get_by_label("Your note").fill("A revised observation.")
+    remove_arts = selected.get_by_role("button", name="Remove Arts", exact=True)
+    remove_arts.focus()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    expect(remove_arts).to_be_focused()
+    page.reload()
+    expect(
+        selected.get_by_role("button", name="Remove Arts", exact=True)
+    ).to_be_visible()
+    expect(
+        selected.get_by_role("button", name="Remove History", exact=True)
+    ).to_be_visible()

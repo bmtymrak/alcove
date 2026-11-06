@@ -27,6 +27,11 @@ from .serializers import (
     NotePageSerializer,
     NoteSerializer,
     TopicCreateSerializer,
+    TopicMoveDestinationSerializer,
+    TopicMoveSerializer,
+    TopicPreviewSerializer,
+    TopicRemovalModeSerializer,
+    TopicRemovalSerializer,
     TopicRenameSerializer,
     TopicSerializer,
 )
@@ -390,3 +395,77 @@ class TopicView(APIView):
         payload.is_valid(raise_exception=True)
         topic = topics.rename(collection, topic_id, **payload.validated_data)
         return Response(TopicSerializer(topic).data)
+
+
+TOPIC_APPLY_ERRORS = {
+    **WRITE_ERRORS,
+    409: OpenApiResponse(ErrorSerializer, description="The Topic preview is stale."),
+}
+
+
+class TopicMovePreviewView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="topics_preview_move",
+        request=TopicMoveDestinationSerializer,
+        responses={200: TopicPreviewSerializer, **WRITE_ERRORS},
+    )
+    def post(self, request: Request, topic_id: UUID) -> Response:
+        collection = collections.for_owner(request.user)
+        topics.get(collection, topic_id)
+        payload = TopicMoveDestinationSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        preview = topics.preview_move(collection, topic_id, **payload.validated_data)
+        return Response(TopicPreviewSerializer(preview).data)
+
+
+class TopicMoveView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="topics_move",
+        request=TopicMoveSerializer,
+        responses={200: TopicSerializer, **TOPIC_APPLY_ERRORS},
+    )
+    def post(self, request: Request, topic_id: UUID) -> Response:
+        collection = collections.for_owner(request.user)
+        topics.get(collection, topic_id)
+        payload = TopicMoveSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        topic = topics.move(collection, topic_id, **payload.validated_data)
+        return Response(TopicSerializer(topic).data)
+
+
+class TopicRemovalPreviewView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="topics_preview_removal",
+        request=TopicRemovalModeSerializer,
+        responses={200: TopicPreviewSerializer, **WRITE_ERRORS},
+    )
+    def post(self, request: Request, topic_id: UUID) -> Response:
+        collection = collections.for_owner(request.user)
+        topics.get(collection, topic_id)
+        payload = TopicRemovalModeSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        preview = topics.preview_removal(collection, topic_id, **payload.validated_data)
+        return Response(TopicPreviewSerializer(preview).data)
+
+
+class TopicRemovalView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="topics_remove",
+        request=TopicRemovalSerializer,
+        responses={204: None, **TOPIC_APPLY_ERRORS},
+    )
+    def post(self, request: Request, topic_id: UUID) -> Response:
+        collection = collections.for_owner(request.user)
+        topics.get(collection, topic_id)
+        payload = TopicRemovalSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        topics.remove(collection, topic_id, **payload.validated_data)
+        return Response(status=204)

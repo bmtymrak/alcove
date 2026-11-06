@@ -1,5 +1,6 @@
 import json
 from collections.abc import Sequence
+from typing import Literal
 from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
@@ -10,7 +11,16 @@ from django.utils.crypto import salted_hmac
 from django.views.decorators.http import require_GET, require_http_methods
 
 from . import books, collections, notes, reading, topics
-from .forms import BookForm, CaptureForm, EditForm, TopicCreateForm, TopicRenameForm
+from .forms import (
+    BookForm,
+    CaptureForm,
+    EditForm,
+    TopicCreateForm,
+    TopicMoveForm,
+    TopicRemovalForm,
+    TopicRenameForm,
+    TopicReorganizationForm,
+)
 from .models import Collection
 
 
@@ -307,4 +317,64 @@ def topic_rename(request: HttpRequest, topic_id: UUID) -> HttpResponse:
         "alcove/topic_rename.html",
         {"topic": topic, "form": form},
         status=400 if form.is_bound else 200,
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def topic_reorganize(
+    request: HttpRequest, topic_id: UUID, operation: Literal["move", "remove"]
+) -> HttpResponse:
+    collection = collections.for_owner(request.user)
+    topic = topics.path_for(collection, topic_id)
+    moving = operation == "move"
+    data = request.POST if request.method == "POST" else None
+    form: TopicReorganizationForm
+    if moving:
+        form = TopicMoveForm(
+            data,
+            initial={"parent": str(topic.parent) if topic.parent else ""},
+            parent_options=[
+                (str(entry.id), entry.full_path)
+                for entry in topics.tree(collection)
+                if entry.id != topic_id and topic_id not in entry.ancestors
+            ],
+        )
+    else:
+        form = TopicRemovalForm(data)
+    status = 400 if form.is_bound else 200
+    preview = None
+    if form.is_valid():
+        action = request.POST.get("action")
+        fields = form.cleaned_data
+        try:
+            if action == "preview":
+                preview = (
+                    topics.preview_move(collection, topic_id, fields["parent"])
+                    if moving
+                    else topics.preview_removal(collection, topic_id, fields["mode"])
+                )
+                status = 200
+            elif action == "apply" and fields["confirmation"]:
+                if moving:
+                    topics.move(collection, topic_id, **fields)
+                else:
+                    topics.remove(collection, topic_id, **fields)
+                return redirect("topic-tree")
+            else:
+                form.add_error(None, "Preview this change before applying it.")
+        except notes.NoteError as exc:
+            status = exc.status
+            if exc.fields:
+                for field, messages in exc.fields.items():
+                    for message in messages:
+                        form.add_error(field, message)
+            else:
+                form.add_error(None, str(exc))
+
+    return render(
+        request,
+        "alcove/topic_reorganize.html",
+        {"topic": topic, "moving": moving, "form": form, "preview": preview},
+        status=status,
     )

@@ -92,8 +92,10 @@ export function autosave(form, draft, picker) {
       }
       assigned = result.topics.map(topic => topic.id)
       topicBaseline = [...assigned].sort()
+      const submitted = JSON.parse(pending)
+      picker.replace(result.topics, submitted.topic_ids)
       revision.value = result.revision
-      saved = pending
+      saved = JSON.stringify({ ...submitted, topic_ids: topicBaseline })
       conflict.hidden = true
       showState(snapshot() === saved ? 'saved' : 'saving')
     } catch {

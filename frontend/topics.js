@@ -7,13 +7,14 @@ export function topicPicker(form, recovered, changed) {
   const data = JSON.parse(fieldset.querySelector('#topic-picker-data').textContent)
   const options = new Map(data.options.map(topic => [topic.id, topic]))
   const selected = new Set(data.assigned)
+  let shown = new Map()
   let timer
   let requestId = 0
 
-  function assign(topic) {
+  function assign(topic, matching = options) {
     options.set(topic.id, topic)
     for (const id of selected) {
-      if (topic.ancestors.includes(id) || options.get(id)?.ancestors.includes(topic.id)) {
+      if (topic.ancestors.includes(id) || matching.get(id)?.ancestors.includes(topic.id)) {
         selected.delete(id)
       }
     }
@@ -21,11 +22,16 @@ export function topicPicker(form, recovered, changed) {
   }
 
   function renderSelection() {
+    const names = new Map([...selected].map(id => [
+      id, options.get(id)?.full_path || 'Unavailable Topic',
+    ]))
+    if (names.size === shown.size && [...names].every(([id, name]) => shown.get(id) === name)) {
+      return false
+    }
+    shown = names
     selection.replaceChildren()
-    const sorted = [...selected].sort((first, second) =>
-      (options.get(first)?.full_path || '').localeCompare(options.get(second)?.full_path || ''))
-    for (const id of sorted) {
-      const name = options.get(id)?.full_path || 'Unavailable Topic'
+    const sorted = [...names].sort(([, first], [, second]) => first.localeCompare(second))
+    for (const [id, name] of sorted) {
       const item = document.createElement('li')
       const button = document.createElement('button')
       button.type = 'button'
@@ -41,6 +47,7 @@ export function topicPicker(form, recovered, changed) {
       item.append(name, ' ', button)
       selection.append(item)
     }
+    return true
   }
 
   function refresh() {
@@ -58,6 +65,9 @@ export function topicPicker(form, recovered, changed) {
         if (!response.ok) throw new Error('Topic search failed')
         const matches = await response.json()
         if (id !== requestId) return
+        // A path match includes all its descendants. Use the fresh matches
+        // rather than cached ancestry for Topics that may have been moved.
+        const matching = new Map(matches.map(topic => [topic.id, topic]))
         for (const topic of matches) {
           options.set(topic.id, topic)
           if (selected.has(topic.id)) continue
@@ -66,7 +76,7 @@ export function topicPicker(form, recovered, changed) {
           button.type = 'button'
           button.textContent = topic.full_path
           button.addEventListener('click', () => {
-            assign(topic)
+            assign(topic, matching)
             renderSelection()
             input.value = ''
             refresh()
@@ -76,6 +86,7 @@ export function topicPicker(form, recovered, changed) {
           item.append(button)
           suggestions.append(item)
         }
+        renderSelection()
         feedback.textContent = suggestions.childElementCount ? '' : 'No matching Topics to add.'
       } catch {
         if (id === requestId) feedback.textContent = 'Could not load Topics. Try searching again.'
@@ -107,14 +118,17 @@ export function topicPicker(form, recovered, changed) {
   return {
     initialIds: data.assigned,
     ids: () => [...selected].sort(),
-    replace(topics) {
+    replace(topics, submittedIds = [...selected]) {
+      // Preserve Topic edits made while the save was in flight.
+      const removed = new Set(submittedIds.filter(id => !selected.has(id)))
+      const added = [...selected].filter(id => !submittedIds.includes(id))
       selected.clear()
       for (const topic of topics) {
         options.set(topic.id, topic)
-        selected.add(topic.id)
+        if (!removed.has(topic.id)) selected.add(topic.id)
       }
-      renderSelection()
-      refresh()
+      added.forEach(id => selected.add(id))
+      if (renderSelection()) refresh()
     },
   }
 }

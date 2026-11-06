@@ -14,7 +14,7 @@ from .notes import (
     validated_content,
     validated_page_number,
 )
-from .topics import AssignmentChange, TopicPath
+from .topics import MOVE_RESOLUTIONS, REMOVAL_MODES, AssignmentChange, TopicPath
 
 
 class NoteForm(forms.Form):
@@ -210,3 +210,34 @@ class TopicCreateForm(forms.Form):
     ) -> None:
         super().__init__(*args, **kwargs)
         self.fields["parent"].widget.choices = [("", "No parent"), *parent_options]
+
+
+class TopicReorganizationForm(forms.Form):
+    confirmation = forms.RegexField(r"\A[0-9a-f]{64}\Z", max_length=64, required=False)
+
+
+class TopicMoveForm(TopicReorganizationForm):
+    parent = forms.UUIDField(label="New parent", required=False, widget=forms.Select)
+    resolution = forms.ChoiceField(
+        label="Conflicting assignments",
+        choices=[("", "Choose which assignments to keep"), *MOVE_RESOLUTIONS.items()],
+        required=False,
+    )
+
+    def __init__(
+        self, *args: Any, parent_options: list[tuple[str, str]], **kwargs: Any
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["parent"].widget.choices = [("", "Root"), *parent_options]
+
+    def clean(self) -> dict[str, Any]:
+        data = super().clean() or {}
+        if "parent" not in self.data:
+            self.add_error("parent", "Choose a new parent or the root.")
+        return data
+
+
+class TopicRemovalForm(TopicReorganizationForm):
+    mode = forms.ChoiceField(
+        label="Child Topics", choices=[("", "Choose an option"), *REMOVAL_MODES.items()]
+    )

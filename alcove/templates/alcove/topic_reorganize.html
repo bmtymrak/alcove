@@ -1,0 +1,69 @@
+{% extends "alcove/base.html" %}
+{% block title %}{% if moving %}Move{% else %}Remove{% endif %} Topic · Alcove{% endblock %}
+{% block content %}
+<a href="{% url 'topic-tree' %}">← Topics</a>
+<h1>{% if moving %}Move{% else %}Remove{% endif %} {{ topic.full_path }}</h1>
+{% if not preview %}
+<form class="panel" method="post">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {{ form.confirmation.errors }}
+  {{ form.resolution.errors }}
+  {% if moving %}
+    {{ form.parent.errors }}
+    <p>{{ form.parent.label_tag }} {{ form.parent }}</p>
+    <button name="action" value="preview">Preview move</button>
+  {% else %}
+    {{ form.mode.errors }}
+    <p>{{ form.mode.label_tag }} {{ form.mode }}</p>
+    <button name="action" value="preview">Preview removal</button>
+  {% endif %}
+</form>
+
+{% else %}
+<section class="panel" aria-labelledby="preview-heading">
+  <h2 id="preview-heading">Preview</h2>
+  <h3>Affected Topics</h3>
+  <ul>
+    {% for row in preview.topics %}
+    <li>{{ row.topic.full_path }} → {% if row.new_path %}<strong>{{ row.new_path }}</strong>{% else %}Remove{% endif %}</li>
+    {% endfor %}
+  </ul>
+
+  {% if preview.assignments %}
+  <h3>{% if moving %}Conflicting Topic Assignments{% else %}Topic Assignments to clear{% endif %}</h3>
+  <ul>
+    {% for row in preview.assignments %}
+    <li><a href="{% url 'note' row.note %}">{{ row.note_excerpt }}</a>
+      <ul>
+        {% if row.ancestor %}<li>Ancestor assignment: {{ row.ancestor.full_path }}</li>{% endif %}
+        <li>{% if row.ancestor %}Descendant assignment: {% endif %}{{ row.topic.full_path }}</li>
+      </ul>
+    </li>
+    {% endfor %}
+  </ul>
+  {% elif moving %}
+  <p>No Topic Assignments conflict.</p>
+  {% else %}
+  <p>No Topic Assignments will be cleared.</p>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="confirmation" value="{{ preview.confirmation }}">
+    {% if moving %}
+      <input type="hidden" name="parent" value="{{ form.parent.value|default_if_none:'' }}">
+      {% if preview.assignments %}
+      <p>{{ form.resolution.label_tag }} {{ form.resolution }}</p>
+      {% endif %}
+      <button name="action" value="apply">Apply move</button>
+    {% else %}
+      <input type="hidden" name="mode" value="{{ form.mode.value }}">
+      <p>All Notes and their source details will be kept.</p>
+      <button name="action" value="apply">Confirm removal</button>
+    {% endif %}
+    <a href="{{ request.path }}">Change options</a>
+  </form>
+</section>
+{% endif %}
+{% endblock %}
