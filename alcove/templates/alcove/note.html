@@ -6,6 +6,7 @@
 <h1>Your note</h1>
 <article class="panel">
   {% include "alcove/note_source.html" %}
+{% include "alcove/note_topics.html" %}
   <div class="note-content">{{ note.content|render_note }}</div>
   <p class="metadata">Captured {{ note.captured_at|date:"M j, Y, H:i" }} UTC<br>Updated {{ note.updated_at|date:"M j, Y, H:i" }} UTC</p>
 </article>

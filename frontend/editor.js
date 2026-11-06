@@ -6,6 +6,7 @@ import { autosave } from './autosave'
 import { explicitCapture } from './capture'
 import { noteChapters } from './chapters'
 import { noteDraft, noteSourceInputs } from './drafts'
+import { topicPicker } from './topics'
 
 const form = document.querySelector('[data-note-editor]')
 if (form) initializeEditor(form)
@@ -32,6 +33,7 @@ function initializeEditor(form) {
   const syncChapter = noteChapters(form)
   const initialBook = book.value || null
   let editor
+  let picker
   let changed = () => {}
   try {
     if (form.dataset.rejected === 'true') throw new Error('Rejected document')
@@ -87,6 +89,7 @@ function initializeEditor(form) {
       onSelectionUpdate: updateToolbar,
       onTransaction: updateToolbar,
     })
+    picker = topicPicker(form, recovered, () => changed())
   } catch {
     if (draft.recovered) {
       // A native submit would skip acknowledgement of the local draft and
@@ -163,8 +166,8 @@ function initializeEditor(form) {
   host.hidden = false
   toolbar.hidden = false
   sync()
-  if (form.querySelector('[name="revision"]')) changed = autosave(form, draft)
-  else changed = explicitCapture(form, editor, draft, initialBook)
+  if (form.querySelector('[name="revision"]')) changed = autosave(form, draft, picker)
+  else changed = explicitCapture(form, editor, draft, initialBook, picker)
   updateToolbar()
   editor.commands.focus('end')
 }

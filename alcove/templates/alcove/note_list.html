@@ -2,6 +2,7 @@
 {% for note in notes %}<article class="panel">
 <div class="note-content">{{ note.content|render_note }}</div>
 {% include "alcove/note_source.html" %}
+{% include "alcove/note_topics.html" %}
 <a href="{% url 'note' note.id %}">Open note <span class="metadata">· {{ note.captured_at|date:"M j, Y, H:i" }} UTC</span></a>
 </article>
 {% empty %}<p>No notes yet. Start with a thought from your reading.</p>{% endfor %}

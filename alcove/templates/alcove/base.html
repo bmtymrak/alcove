@@ -13,6 +13,7 @@
     <nav aria-label="Main navigation">
       <a href="{% url 'index' %}">Books</a>
       <a href="{% url 'notes' %}">All notes</a>
+      <a href="{% url 'topic-tree' %}">Topics</a>
       <span>{{ user.username }}</span>
       <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="quiet">Sign out</button></form>
     </nav>

@@ -68,7 +68,7 @@ function captureSlot(path, alternative) {
   return 'capture:' + path + (alternative ? `?draft=${encodeURIComponent(alternative)}` : '')
 }
 
-export function noteSnapshot(form) {
+export function noteSnapshot(form, picker) {
   const pageText = form.elements.page_number.value.trim()
   const page = Number(pageText)
   return JSON.stringify({
@@ -78,6 +78,7 @@ export function noteSnapshot(form) {
     page_number: pageText && /^[0-9]+$/.test(pageText) && Number.isSafeInteger(page)
       ? page : pageText || null,
     source_reference: form.elements.source_reference.value,
+    topic_ids: picker.ids(),
   })
 }
 

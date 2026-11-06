@@ -1,7 +1,11 @@
 import uuid
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
+
+if TYPE_CHECKING:
+    from .topics import TopicPath
 
 
 class Collection(models.Model):
@@ -30,6 +34,9 @@ class Chapter(models.Model):
 
 
 class Note(models.Model):
+    if TYPE_CHECKING:
+        topics: list[TopicPath]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
     book = models.ForeignKey(Book, null=True, blank=True, on_delete=models.SET_NULL)
@@ -52,5 +59,41 @@ class Note(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["collection", "capture_id"], name="unique_collection_capture"
+            )
+        ]
+
+
+TOPIC_LABEL_LENGTH = 300
+
+
+class Topic(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
+    parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.CASCADE)
+    label = models.CharField(max_length=TOPIC_LABEL_LENGTH)
+    label_key = models.TextField(editable=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["collection", "parent", "label_key"],
+                name="unique_sibling_topic_label",
+            ),
+            models.UniqueConstraint(
+                fields=["collection", "label_key"],
+                condition=models.Q(parent__isnull=True),
+                name="unique_root_topic_label",
+            ),
+        ]
+
+
+class TopicAssignment(models.Model):
+    note = models.ForeignKey(Note, on_delete=models.CASCADE)
+    topic = models.ForeignKey(Topic, on_delete=models.CASCADE)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["note", "topic"], name="unique_note_topic_assignment"
             )
         ]

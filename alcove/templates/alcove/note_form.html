@@ -40,6 +40,7 @@
     <p>Chapter: <span data-current-chapter></span><br>
       Page number: <span data-current-page></span><br>
       Source reference: <span data-current-reference></span></p>
+    <p>Topics: <span data-current-topics></span></p>
     <pre data-current-content></pre>
     <p>Your pending version remains in this form. Reconcile your changes before saving your version over the reviewed revision.</p>
     <button type="button" data-resolve-conflict hidden>Save my version</button>
@@ -63,6 +64,7 @@
   {{ form.page_number.label_tag }}{{ form.page_number }}
   {{ form.source_reference.errors }}
   {{ form.source_reference.label_tag }}{{ form.source_reference }}
+  {% include "alcove/topic_picker.html" %}
   <div class="actions">
     <button data-explicit-save>{% if note %}Save changes{% else %}Save note{% endif %}</button>
     {% if not note %}<button name="add_another" value="1">Save and add another</button>{% endif %}

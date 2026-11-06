@@ -613,8 +613,200 @@ paths:
               schema:
                 $ref: '#/components/schemas/Conflict'
           description: Stale revision; no change. Review the current Note via GET.
+  /api/v1/topics/:
+    get:
+      operationId: topics_list
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Match Topic labels or full paths.
+      tags:
+      - topics
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Topic'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+    post:
+      operationId: topics_create
+      tags:
+      - topics
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TopicCreateRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Topic'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
+  /api/v1/topics/{topic_id}/:
+    get:
+      operationId: topics_read
+      parameters:
+      - in: path
+        name: topic_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - topics
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Topic'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+    patch:
+      operationId: topics_rename
+      parameters:
+      - in: path
+        name: topic_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - topics
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TopicRenameRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Topic'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
 components:
   schemas:
+    ActionEnum:
+      enum:
+      - assign
+      - unassign
+      type: string
+      description: |-
+        * `assign` - assign
+        * `unassign` - unassign
     Book:
       type: object
       properties:
@@ -674,6 +866,12 @@ components:
     CaptureRequest:
       type: object
       properties:
+        topic_changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopicChangeRequest'
+          description: Apply these operations in order. Assigning a Topic replaces
+            assigned ancestors and descendants. Omission leaves assignments alone.
         book:
           type:
           - string
@@ -772,6 +970,12 @@ components:
     EditRequest:
       type: object
       properties:
+        topic_changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopicChangeRequest'
+          description: Apply these operations in order. Assigning a Topic replaces
+            assigned ancestors and descendants. Omission leaves assignments alone.
         book:
           type:
           - string
@@ -830,6 +1034,10 @@ components:
     Note:
       type: object
       properties:
+        topics:
+          type: array
+          items:
+            $ref: '#/components/schemas/Topic'
         id:
           type: string
           format: uuid
@@ -880,6 +1088,7 @@ components:
       - plain_text
       - revision
       - source_reference
+      - topics
       - updated_at
     NoteBlock:
       oneOf:
@@ -1117,6 +1326,72 @@ components:
       required:
       - type
       - text
+    Topic:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        parent:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        label:
+          type: string
+          maxLength: 300
+        path:
+          type: array
+          items:
+            type: string
+        ancestors:
+          type: array
+          items:
+            type: string
+            format: uuid
+        full_path:
+          type: string
+      required:
+      - ancestors
+      - full_path
+      - id
+      - label
+      - parent
+      - path
+    TopicChangeRequest:
+      type: object
+      properties:
+        action:
+          $ref: '#/components/schemas/ActionEnum'
+        topic:
+          type: string
+          format: uuid
+      required:
+      - action
+      - topic
+    TopicCreateRequest:
+      type: object
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 300
+        parent:
+          type:
+          - string
+          - 'null'
+          format: uuid
+      required:
+      - label
+    TopicRenameRequest:
+      type: object
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 300
+      required:
+      - label
   securitySchemes:
     cookieAuth:
       type: apiKey

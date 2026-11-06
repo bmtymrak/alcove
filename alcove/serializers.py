@@ -4,7 +4,8 @@ from uuid import UUID
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from . import chapters, notes
+from . import chapters, notes, topics
+from .models import TOPIC_LABEL_LENGTH
 
 
 class StrictSerializer(serializers.Serializer):
@@ -50,7 +51,35 @@ class PageNumberField(serializers.IntegerField):
         return value
 
 
+class TopicSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    parent = serializers.UUIDField(allow_null=True)  # type: ignore[assignment]
+    label = serializers.CharField(max_length=TOPIC_LABEL_LENGTH)  # type: ignore[assignment]
+    path = serializers.ListField(child=serializers.CharField())
+    ancestors = serializers.ListField(child=serializers.UUIDField())
+    full_path = serializers.CharField()
+
+
+class TopicChangeSerializer(StrictSerializer):
+    action = serializers.ChoiceField(choices=["assign", "unassign"])
+    topic = StrictUUIDField()
+
+
 class NoteSourceSerializer(StrictSerializer):
+    topic_changes = TopicChangeSerializer(
+        many=True,
+        required=False,
+        help_text=(
+            "Apply these operations in order. Assigning a Topic replaces assigned "
+            "ancestors and descendants. Omission leaves assignments alone."
+        ),
+    )
+
+    def validate_topic_changes(
+        self, changes: list[dict[str, Any]]
+    ) -> list[topics.AssignmentChange]:
+        return [topics.AssignmentChange(**change) for change in changes]
+
     book = serializers.UUIDField(required=False, allow_null=True)
     chapter = StrictUUIDField(
         required=False,
@@ -100,6 +129,7 @@ class EditSerializer(NoteSourceSerializer):
 
 
 class NoteSerializer(serializers.Serializer):
+    topics = TopicSerializer(many=True)
     id = serializers.UUIDField()
     content = ContentField()
     book = serializers.UUIDField(source="book_id", allow_null=True)
@@ -172,7 +202,7 @@ class BookPageSerializer(serializers.Serializer):
     results = BookSerializer(many=True)
 
 
-class ChapterLabelField(serializers.CharField):
+class StrictLabelField(serializers.CharField):
     def to_internal_value(self, data: Any) -> str:
         if not isinstance(data, str):
             self.fail("invalid")
@@ -180,11 +210,11 @@ class ChapterLabelField(serializers.CharField):
 
 
 class ChapterCreateSerializer(StrictSerializer):
-    label = ChapterLabelField(max_length=chapters.MAX_LABEL_LENGTH)  # type: ignore[assignment]
+    label = StrictLabelField(max_length=chapters.MAX_LABEL_LENGTH)  # type: ignore[assignment]
 
 
 class ChapterEditSerializer(StrictSerializer):
-    label = ChapterLabelField(  # type: ignore[assignment]
+    label = StrictLabelField(  # type: ignore[assignment]
         max_length=chapters.MAX_LABEL_LENGTH, required=False
     )
     position = StrictIntegerField(
@@ -198,3 +228,11 @@ class ChapterSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     label = serializers.CharField(max_length=chapters.MAX_LABEL_LENGTH)  # type: ignore[assignment]
     position = serializers.IntegerField(min_value=1)
+
+
+class TopicRenameSerializer(StrictSerializer):
+    label = StrictLabelField(max_length=TOPIC_LABEL_LENGTH)  # type: ignore[assignment]
+
+
+class TopicCreateSerializer(TopicRenameSerializer):
+    parent = StrictUUIDField(required=False, allow_null=True)  # type: ignore[assignment]

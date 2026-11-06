@@ -1,7 +1,8 @@
 import { noteSnapshot, noteSourceInputs } from './drafts'
+import { notePayload } from './topics'
 
 // Existing Notes use revision-checked saves; creation remains an explicit action.
-export function autosave(form, draft) {
+export function autosave(form, draft, picker) {
   const revision = form.querySelector('[name="revision"]')
   const book = form.querySelector('[name="book"]')
   const status = form.querySelector('#save-status')
@@ -10,7 +11,7 @@ export function autosave(form, draft) {
   const review = form.querySelector('[data-review-conflict]')
   const conflict = form.querySelector('#save-conflict')
   const resolve = form.querySelector('[data-resolve-conflict]')
-  const snapshot = () => noteSnapshot(form)
+  const snapshot = () => noteSnapshot(form, picker)
   let blocked = form.dataset.saveState === 'saved' ? null : form.dataset.saveState
   let saved = blocked ? null : snapshot()
   if (draft.recovered) {
@@ -22,7 +23,10 @@ export function autosave(form, draft) {
   let saving = false
   let persisted = true
   let timer
+  let assigned = picker.initialIds
+  let topicBaseline = draft.recovered?.topicBaseline || [...assigned].sort()
   let reviewedRevision
+  let reviewedTopics
 
   function showState(state) {
     status.textContent = {
@@ -49,7 +53,7 @@ export function autosave(form, draft) {
   function persist() {
     const pending = snapshot()
     persisted = draft.write(pending === saved && !saving ? null : {
-      snapshot: pending, revision: Number(revision.value), blocked,
+      snapshot: pending, revision: Number(revision.value), blocked, topicBaseline,
     })
   }
 
@@ -72,7 +76,7 @@ export function autosave(form, draft) {
           'Content-Type': 'application/json',
           'X-CSRFToken': form.querySelector('[name="csrfmiddlewaretoken"]').value,
         },
-        body: JSON.stringify({ ...JSON.parse(pending), revision: Number(revision.value) }),
+        body: JSON.stringify({ ...notePayload(pending, assigned), revision: Number(revision.value) }),
       })
       const result = await response.json()
       if (!response.ok) {
@@ -86,6 +90,8 @@ export function autosave(form, draft) {
       if (!Number.isSafeInteger(result.revision) || result.revision <= Number(revision.value)) {
         throw new Error('Save not confirmed')
       }
+      assigned = result.topics.map(topic => topic.id)
+      topicBaseline = [...assigned].sort()
       revision.value = result.revision
       saved = pending
       conflict.hidden = true
@@ -118,6 +124,8 @@ export function autosave(form, draft) {
       if (!response.ok) throw new Error('Review failed')
       const current = await response.json()
       reviewedRevision = current.revision
+      reviewedTopics = current.topics
+      conflict.querySelector('[data-current-topics]').textContent = reviewedTopics.map(topic => topic.full_path).join(', ') || '—'
       conflict.querySelector('[data-current-content]').textContent = current.plain_text
       const source = [...book.options].find(option => option.value === (current.book || ''))
       conflict.querySelector('[data-current-source]').textContent = source?.textContent || current.book
@@ -136,6 +144,12 @@ export function autosave(form, draft) {
   })
   resolve.addEventListener('click', () => {
     revision.value = reviewedRevision
+    assigned = reviewedTopics.map(topic => topic.id)
+    // A content-only edit can retain the Topics added by the other editor.
+    if (JSON.stringify(picker.ids()) === JSON.stringify(topicBaseline)) {
+      picker.replace(reviewedTopics)
+    }
+    topicBaseline = [...assigned].sort()
     blocked = null
     resolve.hidden = true
     void save()

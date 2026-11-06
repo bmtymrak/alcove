@@ -10,7 +10,7 @@ from rest_framework.reverse import reverse
 from rest_framework.serializers import Serializer
 from rest_framework.views import APIView
 
-from . import books, chapters, collections, notes, reading
+from . import books, chapters, collections, notes, reading, topics
 from .serializers import (
     BookCreateSerializer,
     BookEditSerializer,
@@ -25,6 +25,9 @@ from .serializers import (
     ErrorSerializer,
     NotePageSerializer,
     NoteSerializer,
+    TopicCreateSerializer,
+    TopicRenameSerializer,
+    TopicSerializer,
 )
 
 ERRORS = {
@@ -108,7 +111,7 @@ class NoteView(APIView):
 
     @extend_schema(operation_id="notes_read", responses={200: NoteSerializer, **ERRORS})
     def get(self, request: Request, note_id: UUID) -> Response:
-        note = reading.note(collections.for_owner(request.user), note_id)
+        note = reading.note_with_topics(collections.for_owner(request.user), note_id)
         return Response(NoteSerializer(note).data)
 
     @extend_schema(
@@ -271,3 +274,59 @@ class BookNotesView(APIView):
             request.query_params.get("order", "oldest"),
         )
         return page_response(page, NoteSerializer)
+
+
+class TopicsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="topics_list",
+        parameters=[
+            OpenApiParameter("q", str, description="Match Topic labels or full paths.")
+        ],
+        responses={200: TopicSerializer(many=True), **ERRORS},
+    )
+    def get(self, request: Request) -> Response:
+        collection = collections.for_owner(request.user)
+        matches = topics.tree(collection, request.query_params.get("q", ""))
+        return Response(TopicSerializer(matches, many=True).data)
+
+    @extend_schema(
+        operation_id="topics_create",
+        request=TopicCreateSerializer,
+        responses={201: TopicSerializer, **WRITE_ERRORS},
+    )
+    def post(self, request: Request) -> Response:
+        collection = collections.for_owner(request.user)
+        payload = TopicCreateSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        topic = topics.create(collection, **payload.validated_data)
+        return Response(
+            TopicSerializer(topic).data,
+            status=201,
+            headers={"Location": reverse("api-topic", kwargs={"topic_id": topic.id})},
+        )
+
+
+class TopicView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="topics_read", responses={200: TopicSerializer, **ERRORS}
+    )
+    def get(self, request: Request, topic_id: UUID) -> Response:
+        topic = topics.path_for(collections.for_owner(request.user), topic_id)
+        return Response(TopicSerializer(topic).data)
+
+    @extend_schema(
+        operation_id="topics_rename",
+        request=TopicRenameSerializer,
+        responses={200: TopicSerializer, **WRITE_ERRORS},
+    )
+    def patch(self, request: Request, topic_id: UUID) -> Response:
+        collection = collections.for_owner(request.user)
+        topics.get(collection, topic_id)
+        payload = TopicRenameSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        topic = topics.rename(collection, topic_id, **payload.validated_data)
+        return Response(TopicSerializer(topic).data)

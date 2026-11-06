@@ -1,6 +1,7 @@
 import { noteSnapshot, noteSourceInputs } from './drafts'
+import { notePayload } from './topics'
 
-export function explicitCapture(form, editor, draft, initialBook) {
+export function explicitCapture(form, editor, draft, initialBook, picker) {
   const id = form.querySelector('[name="capture_id"]')
   const book = form.querySelector('[name="book"]')
   const sourceInputs = noteSourceInputs(form)
@@ -13,11 +14,11 @@ export function explicitCapture(form, editor, draft, initialBook) {
 
   function persist() {
     const unsaved = !editor.isEmpty || (book.value || null) !== initialBook
-      || form.elements.chapter.value
+      || picker.ids().length || form.elements.chapter.value
       || form.elements.page_number.value || form.elements.source_reference.value
       || form.hasAttribute('data-bound')
     const value = unsaved
-      ? { snapshot: noteSnapshot(form) }
+      ? { snapshot: noteSnapshot(form, picker) }
       : null
     persisted = draft.write(pending || value)
   }
@@ -25,6 +26,7 @@ export function explicitCapture(form, editor, draft, initialBook) {
   function lockInput(locked) {
     sourceInputs.forEach(input => { input.disabled = locked })
     toolbar.querySelectorAll('button').forEach(button => { button.disabled = locked })
+    form.querySelector('[data-topic-picker]').disabled = locked
     editor.setEditable(!locked)
   }
 
@@ -48,8 +50,8 @@ export function explicitCapture(form, editor, draft, initialBook) {
     if (saving) return
     const another = event.submitter?.name === 'add_another'
     const buttons = form.querySelectorAll('[data-explicit-save], [name="add_another"]')
-    pending ||= { snapshot: noteSnapshot(form), captureId: id.value }
-    const payload = JSON.parse(pending.snapshot)
+    pending ||= { snapshot: noteSnapshot(form, picker), captureId: id.value }
+    const payload = notePayload(pending.snapshot)
     persist()
     saving = true
     buttons.forEach(button => { button.disabled = true })

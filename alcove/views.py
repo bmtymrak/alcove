@@ -8,8 +8,8 @@ from django.shortcuts import redirect, render
 from django.utils.crypto import salted_hmac
 from django.views.decorators.http import require_GET, require_http_methods
 
-from . import books, collections, notes, reading
-from .forms import BookForm, CaptureForm, EditForm
+from . import books, collections, notes, reading, topics
+from .forms import BookForm, CaptureForm, EditForm, TopicCreateForm, TopicRenameForm
 from .models import Collection
 
 
@@ -54,6 +54,7 @@ def capture(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse:
         initial={"book": book.id} if book else None,
         book_options=reading.book_options(collection),
         chapter_options=reading.chapter_options(collection),
+        topic_options=topics.tree(collection),
     )
     status = 400 if form.is_bound else 200
     if request.method == "POST" and form.is_valid():
@@ -66,6 +67,7 @@ def capture(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse:
                 chapter=form.cleaned_data["chapter"],
                 page_number=form.cleaned_data["page_number"],
                 source_reference=form.cleaned_data["source_reference"],
+                topic_changes=form.cleaned_data["topic_changes"],
             )
         except notes.NoteError as exc:
             status = exc.status
@@ -91,7 +93,7 @@ def capture(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse:
 @login_required
 @require_GET
 def detail(request: HttpRequest, note_id: UUID) -> HttpResponse:
-    note = reading.note(collections.for_owner(request.user), note_id)
+    note = reading.note_with_topics(collections.for_owner(request.user), note_id)
     return render(request, "alcove/note.html", {"note": note})
 
 
@@ -99,7 +101,7 @@ def detail(request: HttpRequest, note_id: UUID) -> HttpResponse:
 @require_http_methods(["GET", "POST"])
 def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
     collection = collections.for_owner(request.user)
-    note = reading.note(collection, note_id)
+    note = reading.note_with_topics(collection, note_id)
     form = EditForm(
         request.POST if request.method == "POST" else None,
         initial={
@@ -115,6 +117,8 @@ def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
         },
         book_options=reading.book_options(collection),
         chapter_options=reading.chapter_options(collection),
+        topic_options=topics.tree(collection),
+        assigned_topics=tuple(note.topics),
     )
     status = 400 if form.is_bound else 200
     if request.method == "POST" and form.is_valid():
@@ -125,6 +129,7 @@ def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
                 content=form.cleaned_data["document"],
                 revision=form.cleaned_data["revision"],
                 book=form.cleaned_data["book"],
+                topic_changes=form.cleaned_data["topic_changes"],
                 **{
                     field: form.cleaned_data[field]
                     for field in ("chapter", "page_number", "source_reference")
@@ -214,5 +219,61 @@ def book_form(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse
         request,
         "alcove/book_form.html",
         {"book": book, "form": form},
+        status=400 if form.is_bound else 200,
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def topic_tree(request: HttpRequest) -> HttpResponse:
+    collection = collections.for_owner(request.user)
+    entries = topics.tree(collection)
+    form = TopicCreateForm(
+        request.POST if request.method == "POST" else None,
+        parent_options=[(str(entry.id), entry.full_path) for entry in entries],
+    )
+    if form.is_valid():
+        try:
+            topics.create(collection, **form.cleaned_data)
+        except notes.NoteError as exc:
+            for field, messages in exc.fields.items():
+                for message in messages:
+                    form.add_error(field, message)
+        else:
+            return redirect("topic-tree")
+    rows = []
+    for entry, following in zip(entries, [*entries[1:], None]):
+        depth = len(entry.ancestors)
+        next_depth = len(following.ancestors) if following else 0
+        rows.append((entry, next_depth > depth, range(depth - next_depth)))
+    return render(
+        request,
+        "alcove/topic_tree.html",
+        {"rows": rows, "form": form},
+        status=400 if form.is_bound else 200,
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def topic_rename(request: HttpRequest, topic_id: UUID) -> HttpResponse:
+    collection = collections.for_owner(request.user)
+    topic = topics.path_for(collection, topic_id)
+    form = TopicRenameForm(
+        request.POST if request.method == "POST" else None,
+        initial={"label": topic.label},
+    )
+    if form.is_valid():
+        try:
+            topics.rename(collection, topic_id, **form.cleaned_data)
+        except notes.NoteError as exc:
+            for message in exc.fields["label"]:
+                form.add_error("label", message)
+        else:
+            return redirect("topic-tree")
+    return render(
+        request,
+        "alcove/topic_rename.html",
+        {"topic": topic, "form": form},
         status=400 if form.is_bound else 200,
     )

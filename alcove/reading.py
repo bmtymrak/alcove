@@ -1,11 +1,15 @@
+from collections import defaultdict
+from collections.abc import Sequence
 from uuid import UUID
 
 from django.core.paginator import InvalidPage, Page, Paginator
+from django.db import transaction
 from django.db.models import F
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 
-from .models import Book, Chapter, Collection, Note
+from . import topics
+from .models import Book, Chapter, Collection, Note, TopicAssignment
 
 PAGE_SIZE = 20
 CAPTURE_ORDER = ("captured_at", "id")
@@ -18,14 +22,18 @@ BOOK_NOTE_ORDERING = {
 }
 
 
+@transaction.atomic
 def notes(collection: Collection, page: int | str = 1) -> Page[Note]:
     try:
-        return Paginator(
+        result = Paginator(
             Note.objects.filter(collection=collection).select_related(
                 "book", "chapter"
             ),
             PAGE_SIZE,
         ).page(page)
+        result.object_list = list(result.object_list)
+        load_topics(collection, result.object_list)
+        return result
     except InvalidPage as exc:
         raise Http404("Page not found.") from exc
 
@@ -75,6 +83,7 @@ def book_options(collection: Collection) -> list[tuple[str, str]]:
     ]
 
 
+@transaction.atomic
 def book_notes(
     collection: Collection, book_id: UUID, page: int | str = 1, order: str = "oldest"
 ) -> Page[Note]:
@@ -82,11 +91,37 @@ def book_notes(
     if order not in BOOK_NOTE_ORDERING:
         raise Http404("Order not found.")
     try:
-        return Paginator(
+        result = Paginator(
             Note.objects.filter(collection=collection, book_id=book_id)
             .select_related("book", "chapter")
             .order_by(*BOOK_NOTE_ORDERING[order]),
             PAGE_SIZE,
         ).page(page)
+        result.object_list = list(result.object_list)
+        load_topics(collection, result.object_list)
+        return result
     except InvalidPage as exc:
         raise Http404("Page not found.") from exc
+
+
+@transaction.atomic
+def note_with_topics(collection: Collection, note_id: UUID) -> Note:
+    result = note(collection, note_id)
+    load_topics(collection, [result])
+    return result
+
+
+def load_topics(collection: Collection, results: Sequence[Note]) -> None:
+    assigned: dict[UUID, list[UUID]] = defaultdict(list)
+    for note_id, topic_id in TopicAssignment.objects.filter(
+        note_id__in=[result.id for result in results], topic__collection=collection
+    ).values_list("note_id", "topic_id"):
+        assigned[note_id].append(topic_id)
+
+    entries = topics.tree(collection) if assigned else []
+    positions = {entry.id: index for index, entry in enumerate(entries)}
+    for result in results:
+        result.topics = [
+            entries[positions[topic_id]]
+            for topic_id in sorted(assigned[result.id], key=positions.__getitem__)
+        ]

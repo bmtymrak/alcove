@@ -284,3 +284,37 @@ def test_chapter_contract_matches_real_requests_and_responses(signed_in):
         "get",
         200,
     )
+
+
+def test_topic_contract_matches_real_http_requests_and_responses(signed_in):
+    topics = "/api/v1/topics/"
+    detail = topics + "{topic_id}/"
+    payload = {"label": "Humanities", "parent": None}
+    validate_request(payload, topics, "post")
+    response = json_request(signed_in, "post", topics, payload)
+    validate_response(response, topics, "post", 201)
+    topic = response.json()
+    path = response["Location"]
+    validate_response(signed_in.get(path), detail, "get", 200)
+    validate_response(signed_in.get(topics + "?q=human"), topics, "get", 200)
+    payload = {"label": "Arts"}
+    validate_request(payload, detail, "patch")
+    validate_response(
+        json_request(signed_in, "patch", path, payload), detail, "patch", 200
+    )
+    payload = {
+        "content": document("A thought about art."),
+        "topic_changes": [{"action": "assign", "topic": topic["id"]}],
+    }
+    validate_request(payload, COLLECTION, "post")
+    response = json_request(signed_in, "post", COLLECTION, payload)
+    validate_response(response, COLLECTION, "post", 201)
+    path = response["Location"]
+    payload = {
+        "revision": 1,
+        "topic_changes": [{"action": "unassign", "topic": topic["id"]}],
+    }
+    validate_request(payload, DETAIL, "patch")
+    validate_response(
+        json_request(signed_in, "patch", path, payload), DETAIL, "patch", 200
+    )

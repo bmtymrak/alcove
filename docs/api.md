@@ -1,7 +1,7 @@
 # JSON API v1
 
 The API and rendered pages use the same session and shared Collection, Book,
-Chapter, Note, and Reading interfaces. All endpoints below, including `/api/v1/schema/`, require
+Chapter, Note, Topic, and Reading interfaces. All endpoints below, including `/api/v1/schema/`, require
 sign-in. Get `/login/`, then POST the username, password, and CSRF token from that
 page. There is no registration endpoint. Django rotates the CSRF token at login;
 use the new `csrftoken` cookie afterward. POST `/logout/` with CSRF to revoke the
@@ -23,6 +23,10 @@ checks schema drift and validates real request/response examples against it.
 | Append a Chapter | `POST /api/v1/books/{book_id}/chapters/` | `201` |
 | Rename or move a Chapter | `PATCH /api/v1/books/{book_id}/chapters/{chapter_id}/` | `200` |
 | Read a Book's Notes | `GET /api/v1/books/{uuid}/notes/?order=oldest&page=1` | `200` |
+| List Topics or autocomplete | `GET /api/v1/topics/?q=history` | `200`, an ordered array |
+| Create a root or child Topic | `POST /api/v1/topics/` | `201`, with a relative `Location` header |
+| Read a Topic | `GET /api/v1/topics/{uuid}/` | `200` |
+| Rename a Topic | `PATCH /api/v1/topics/{uuid}/` | `200` |
 | List Notes | `GET /api/v1/notes/?page=1` | `200` |
 | Capture a Note | `POST /api/v1/notes/` | `201` on creation or `200` on replay, both with a relative `Location` header |
 | Read a Note | `GET /api/v1/notes/{uuid}/` | `200` |
@@ -69,12 +73,12 @@ and the empty string for the reference.
 Send an optional `"capture_id": "<uuid>"` to make a capture safe to retry.
 Generate a fresh UUID for each new capture, even when two Notes have identical
 content and source. After a timeout or lost response, resend the same UUID,
-document, Book, Chapter, Page Number, and Source Reference. The first successful request
+document, Book, Chapter, Page Number, Source Reference, and ordered Topic operations. The first successful request
 creates the Note and returns `201`. A replay returns `200` and the current
 representation of the same Note,
 including any later edits. Both responses include its `Location`. The identity
-is scoped to the signed-in Collection. Reusing it there with different content or
-source returns `409` with `error.code = "capture_conflict"` and leaves the Note
+is scoped to the signed-in Collection. Reusing it there with different content, source, or
+Topic operations returns `409` with `error.code = "capture_conflict"` and leaves the Note
 intact. Invalid requests do not reserve identities. Omitting the UUID requests a
 new Note on every successful POST. Capture identities are accepted only on create.
 
@@ -107,6 +111,50 @@ Edit revisions must be JSON integers between 1 and 9223372036854775806 (strings,
 booleans, floating-point values, and omitted revisions are rejected), leaving room
 for the increment in SQLite storage. Out-of-range preconditions are field errors
 (`400`) and do not change the Note.
+
+## Topics and Topic Assignments
+
+Create a Topic with a string `label` and optional `parent` UUID. Omission or
+null creates a root Topic. Labels are trimmed, internal whitespace is collapsed, and labels are limited
+to 300 characters. They are
+compared within each sibling group using Unicode case folding and normalization.
+Roots form their own sibling group. A parent must belong to the signed-in
+Collection. Rename accepts a `label` field. A Topic retains its original parent
+when renamed, and descendant paths reflect the new label on the next read.
+
+Topic responses include the stable `id`, the direct `parent` UUID or null,
+the `label`, and `path` as an array of labels from root to leaf. The
+`ancestors` array contains the corresponding UUIDs from root to parent.
+`full_path` is the display string joined with ` › `. A backslash escapes a
+literal separator or backslash within a label. The list follows tree order
+with siblings sorted by normalized label. Supply `q` to match part of a label
+or full path, case insensitively. The query returns only the owner's Topics.
+
+Send `topic_changes` on capture or revision-checked edit. Each operation names a
+Topic UUID and an `assign` or `unassign` action:
+
+```json
+{
+  "revision": 1,
+  "topic_changes": [
+    {"action": "assign", "topic": "11111111-1111-4111-8111-111111111111"},
+    {"action": "unassign", "topic": "22222222-2222-4222-8222-222222222222"}
+  ]
+}
+```
+
+The server applies operations in order. Assigning a Topic removes any explicitly
+assigned ancestors or descendants while preserving independent branches.
+Unassigning removes the named assignment if present. Omission and an empty array
+both preserve existing assignments. Every referenced Topic must belong to the
+Collection. An invalid operation rejects the entire save, including content,
+source, and revision changes. The response field `topics` is an array of
+explicitly assigned Topics in tree order, including their full paths.
+
+The signed-in Topic tree at `/topics/` provides create and rename forms. The
+Note editor offers full-path suggestions and retains selections in capture and
+edit drafts. The native HTML forms accept explicit assignment and unassignment
+selections and apply unassignments first.
 
 ## Canonical Note content
 
@@ -197,7 +245,7 @@ Errors use the following envelope (field values may be nested for document error
 | --- | --- |
 | `400` | Invalid/missing/unknown fields (`invalid`) or malformed JSON (`parse_error`). |
 | `403` | Sign-in required (`not_authenticated`) or failed CSRF (`permission_denied`). |
-| `404` | Book, Chapter, Note, order, or page not found at the requested route (`not_found`). |
+| `404` | Book, Chapter, Note, Topic, order, or page not found at the requested route (`not_found`). |
 | `405` | Unsupported method (`method_not_allowed`). |
 | `409` | Stale edit revision (`conflict`) or capture UUID reused for different input (`capture_conflict`). |
 | `415` | Unsupported request media type (`unsupported_media_type`). |
@@ -210,9 +258,9 @@ Revision conflicts have this additional required field:
 
 `current_revision` is the revision at conflict detection, not permission to
 overwrite it. Retain pending content after errors. For `409`, GET the latest Note
-and let the owner review its content and source and reconcile the changes before
+and let the owner review its content, source, and Topics and reconcile the changes before
 submitting with its revision. A concurrent change after review still returns
-`409`. Every rejected edit leaves content, source, revision, and timestamps intact.
+`409`. Every rejected edit preserves content, source, Topics, revision, and timestamps.
 Retrying an edit with an already-consumed revision produces a conflict.
 Restore preview/confirmation and other operations will be documented with their
 delivery tickets.

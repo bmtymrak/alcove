@@ -1,0 +1,11 @@
+{% extends "alcove/base.html" %}
+{% block title %}Rename Topic · Alcove{% endblock %}
+{% block content %}
+<a href="{% url 'topic-tree' %}">← Topics</a>
+<h1>Rename {{ topic.full_path }}</h1>
+<form class="panel" method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button>Save label</button>
+</form>
+{% endblock %}

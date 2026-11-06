@@ -1,0 +1,19 @@
+<fieldset data-topic-picker data-topics-url="{% url 'api-topics' %}">
+  <legend>Topics</legend>
+  <p><a href="{% url 'topic-tree' %}" target="_blank" rel="noopener">Manage Topics (opens in a new tab)</a></p>
+  {{ form.assign_topics.errors }}
+  {{ form.unassign_topics.errors }}
+  <div data-topic-fallback>
+    {% include "alcove/note_topics.html" %}
+    {{ form.assign_topics.label_tag }}{{ form.assign_topics }}
+    {% if form.has_unassign_choices %}{{ form.unassign_topics.label_tag }}{{ form.unassign_topics }}{% endif %}
+  </div>
+  <div data-topic-enhanced hidden>
+    <ul data-topic-selection aria-label="Selected Topics"></ul>
+    <label for="topic-search">Find a Topic</label>
+    <input id="topic-search" type="search" autocomplete="off" aria-controls="topic-suggestions">
+    <p class="metadata" data-topic-feedback aria-live="polite"></p>
+    <ul id="topic-suggestions" aria-label="Topic suggestions"></ul>
+  </div>
+  {{ form.topic_picker_data|json_script:"topic-picker-data" }}
+</fieldset>

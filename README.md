@@ -70,8 +70,9 @@ location, set `PLAYWRIGHT_BROWSERS_PATH` for both installation and test runs.
 `alcove.collections.for_owner` resolves the authenticated Collection.
 `alcove.books.create/edit` own Book metadata changes.
 `alcove.notes.capture/edit` own content validation, projection, source validation,
-and revision-checked mutation; `alcove.reading` owns scoped Book/Note retrieval,
+Topic Assignment changes, and revision-checked mutation; `alcove.reading` owns scoped Book/Note retrieval,
 ordering, and deterministic pagination.
+`alcove.topics` owns the hierarchy, paths, and assignment replacement.
 Both HTML views and JSON handlers call those interfaces with Collection context.
 The modules persist directly through Django's ORM. Domain rules stay out of the
 transport adapters. No internal module tests or persistence mocks are required.
@@ -95,11 +96,11 @@ range, footnote, or other location. Save and add another retains the selected
 Book and starts with empty location fields. Existing standalone Notes remain
 unassigned after upgrading. Apply the new migrations before starting the server.
 
-Existing Notes autosave content and source changes after a short pause, with one
+Existing Notes autosave content, source, and Topic changes after a short pause, with one
 request at a time and visible saving, saved, failed, and conflict states
 ([Ticket #6](https://github.com/bmtymrak/alcove/issues/6)). Editing stays available
 while saving. Failed requests retain pending content and offer Retry saving.
-Conflicts pause saves: Review current note shows the saved text and source without
+Conflicts pause saves: Review current note shows the saved text, source, and Topics without
 replacing the editor, and Save my version applies the owner's reconciled content
 against that reviewed revision. Open current note opens a separate tab for the
 formatted saved version.
@@ -109,7 +110,11 @@ Creation still requires Save note or Save and add another.
 The editor recovers unfinished captures and pending edits after navigation or
 reload in the same tab. Drafts belong to the signed-in Collection and session.
 After an uncertain capture response, retry confirms the same Note using its
-capture UUID. Acknowledged captures clear the draft. Search, Topics, Note Links,
+capture UUID. Acknowledged captures clear the draft. Open **Topics** from the navigation to
+create or rename roots and children. Capture and edit forms suggest existing
+Topics by full path. Selecting a Topic replaces any selected ancestors or
+descendants and keeps selections on other branches. Saved assignments appear
+alongside Notes. Search, Note Links,
 trash, and portability remain later tickets from Spec #2.
 
 ## Editor assets

@@ -678,3 +678,46 @@ def test_capture_manage_and_browse_chapters_on_phone(page, live_server):
     expect(page.locator("#save-status")).to_have_text("Saved.")
     page.goto(detail)
     expect(page.get_by_text("Chapter:", exact=False)).to_have_count(0)
+
+
+def test_topic_picker_recovers_capture_and_autosaves_replacement(
+    page, live_server, owner
+):
+    page.goto(live_server.url + "/login/")
+    page.get_by_label("Username").fill("reader")
+    page.get_by_label("Password").fill(PASSWORD)
+    page.get_by_role("button", name="Sign in", exact=True).click()
+
+    page.get_by_role("link", name="Topics", exact=True).click()
+    page.get_by_label("Label").fill("Arts")
+    page.get_by_role("button", name="Create Topic").click()
+    page.get_by_label("Label").fill("History")
+    page.get_by_label("Parent").select_option(label="Arts")
+    page.get_by_role("button", name="Create Topic").click()
+
+    page.goto(live_server.url + "/notes/new/")
+    search = page.get_by_label("Find a Topic")
+    search.fill("Arts")
+    page.get_by_role("button", name="Arts", exact=True).click()
+    search.fill("History")
+    page.get_by_role("button", name="Arts › History", exact=True).click()
+    expect(page.get_by_role("button", name="Remove Arts", exact=True)).to_have_count(0)
+    page.get_by_label("Your note").fill("A topic-organized thought.")
+    page.reload()
+    expect(page.get_by_role("button", name="Remove Arts › History")).to_be_visible()
+
+    page.get_by_role("button", name="Save note", exact=True).click()
+    expect(page.get_by_role("list", name="Assigned Topics")).to_have_text(
+        "Arts › History"
+    )
+    page.get_by_role("link", name="Edit note", exact=True).click()
+    search.fill("Arts")
+    page.get_by_role("button", name="Arts", exact=True).click()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    page.reload()
+    expect(page.get_by_role("button", name="Remove Arts", exact=True)).to_be_visible()
+    expect(page.get_by_role("button", name="Remove Arts › History")).to_have_count(0)
+    page.get_by_role("button", name="Remove Arts", exact=True).click()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    page.reload()
+    expect(page.get_by_role("button", name="Remove Arts", exact=True)).to_have_count(0)

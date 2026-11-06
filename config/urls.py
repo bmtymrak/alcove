@@ -19,6 +19,10 @@ urlpatterns = [
     path("books/<uuid:book_id>/", views.book_detail, name="book"),
     path("books/<uuid:book_id>/edit/", views.book_form, name="book-edit"),
     path("notes/", views.note_list, name="notes"),
+    path("topics/", views.topic_tree, name="topic-tree"),
+    path("topics/<uuid:topic_id>/rename/", views.topic_rename, name="topic-rename"),
+    path("api/v1/topics/", api.TopicsView.as_view(), name="api-topics"),
+    path("api/v1/topics/<uuid:topic_id>/", api.TopicView.as_view(), name="api-topic"),
     path("api/v1/books/", api.BooksView.as_view(), name="api-books"),
     path("api/v1/books/<uuid:book_id>/", api.BookView.as_view(), name="api-book"),
     path(

@@ -1,4 +1,5 @@
 import json
+from collections.abc import Sequence
 from enum import Enum
 from hashlib import sha256
 from typing import Any
@@ -9,28 +10,14 @@ from django.db.models import Case, F, When
 from django.http import Http404
 from django.utils import timezone
 
-from . import note_content, reading
+from . import note_content, reading, topics
+from .errors import NoteError as NoteError
 from .models import Chapter, Collection, Note
 
 MAX_CONTENT_LENGTH = note_content.MAX_CONTENT_LENGTH
 # Leave room for the increment in SQLite's signed 64-bit integer storage.
 MAX_EXPECTED_REVISION = 2**63 - 2
 MAX_PAGE_NUMBER = 2**31 - 1
-
-
-class NoteError(Exception):
-    def __init__(
-        self,
-        message: str,
-        *,
-        code: str = "invalid",
-        status: int = 400,
-        fields: dict[str, list[str]] | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.code = code
-        self.status = status
-        self.fields = fields or {}
 
 
 class NoteConflict(NoteError):
@@ -101,6 +88,7 @@ def validated_source_reference(value: Any) -> str:
     return value.replace("\r\n", "\n").replace("\r", "\n")
 
 
+@transaction.atomic
 def capture(
     collection: Collection,
     content: Any,
@@ -110,6 +98,7 @@ def capture(
     chapter: UUID | None = None,
     page_number: int | None = None,
     source_reference: str = "",
+    topic_changes: Sequence[topics.AssignmentChange] = (),
 ) -> tuple[Note, bool]:
     document, text = validated_content(content)
     page_number = validated_page_number(page_number)
@@ -120,15 +109,9 @@ def capture(
         "page_number": page_number,
         "source_reference": source_reference,
     }
-    if capture_id is None:
-        book_id = validated_book(collection, book)
-        return Note.objects.create(
-            collection=collection,
-            book_id=book_id,
-            chapter_id=validated_chapter(collection, book_id, chapter),
-            **fields,
-        ), True
-
+    # Take SQLite's write lock before looking up a prior capture. Its Note and
+    # Topic Assignments must either be created together or both roll back.
+    Collection.objects.filter(pk=collection.pk).update(id=F("id"))
     # Compare against the original input, even if the saved Note has been edited.
     original_fields: list[object] = [str(book) if book else None, document]
     # Preserve fingerprints for captures made before these fields existed.
@@ -136,33 +119,43 @@ def capture(
         original_fields.extend([page_number, source_reference])
     if chapter is not None:
         original_fields.append({"chapter": str(chapter)})
+    if topic_changes:
+        original_fields.append(
+            {
+                "topic_changes": [
+                    {"action": change.action, "topic": str(change.topic)}
+                    for change in topic_changes
+                ]
+            }
+        )
     original_input = json.dumps(original_fields, sort_keys=True)
     fingerprint = sha256(original_input.encode()).hexdigest()
-    captures = Note.objects.filter(collection=collection, capture_id=capture_id)
-    note = captures.first()
-    created = False
-    if note is None:
-        book_id = validated_book(collection, book)
-        chapter_id = validated_chapter(collection, book_id, chapter)
-        # The unique constraint arbitrates simultaneous retries. get_or_create
-        # reads outside its insert transaction, avoiding a SQLite lock upgrade.
-        note, created = Note.objects.get_or_create(
-            collection=collection,
-            capture_id=capture_id,
-            defaults={
-                **fields,
-                "book_id": book_id,
-                "chapter_id": chapter_id,
-                "capture_fingerprint": fingerprint,
-            },
-        )
-    if note.capture_fingerprint != fingerprint:
-        raise NoteError(
-            "This capture identity was already used for different input.",
-            code="capture_conflict",
-            status=409,
-        )
-    return note, created
+    if capture_id is not None:
+        prior = Note.objects.filter(
+            collection=collection, capture_id=capture_id
+        ).first()
+        if prior is not None:
+            if prior.capture_fingerprint != fingerprint:
+                raise NoteError(
+                    "This capture identity was already used for different input.",
+                    code="capture_conflict",
+                    status=409,
+                )
+            reading.load_topics(collection, [prior])
+            return prior, False
+
+    book_id = validated_book(collection, book)
+    note = Note.objects.create(
+        collection=collection,
+        book_id=book_id,
+        chapter_id=validated_chapter(collection, book_id, chapter),
+        capture_id=capture_id,
+        capture_fingerprint=fingerprint if capture_id is not None else "",
+        **fields,
+    )
+    topics.apply_assignment_changes(note, topic_changes)
+    reading.load_topics(collection, [note])
+    return note, True
 
 
 def edit(
@@ -175,6 +168,7 @@ def edit(
     chapter: UUID | None | SourceChange = SourceChange.UNCHANGED,
     page_number: int | None | SourceChange = SourceChange.UNCHANGED,
     source_reference: str | SourceChange = SourceChange.UNCHANGED,
+    topic_changes: Sequence[topics.AssignmentChange] = (),
 ) -> Note:
     if type(revision) is not int or not 1 <= revision <= MAX_EXPECTED_REVISION:
         raise NoteError(
@@ -220,4 +214,6 @@ def edit(
         note = reading.note(collection, note_id)
         if not changed:
             raise NoteConflict(note.revision)
+        topics.apply_assignment_changes(note, topic_changes)
+        reading.load_topics(collection, [note])
         return note

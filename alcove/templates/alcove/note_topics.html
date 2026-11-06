@@ -1,0 +1,5 @@
+{% if note.topics %}
+<ul class="metadata" aria-label="Assigned Topics">
+  {% for topic in note.topics %}<li>{{ topic.full_path }}</li>{% endfor %}
+</ul>
+{% endif %}
