@@ -1,6 +1,6 @@
 import json
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from django import forms
 
@@ -13,7 +13,7 @@ from .notes import (
 )
 
 
-class CaptureForm(forms.Form):
+class NoteForm(forms.Form):
     document_rejected = False
 
     def __init__(
@@ -71,7 +71,13 @@ class CaptureForm(forms.Form):
     )
 
 
-class EditForm(CaptureForm):
+class CaptureForm(NoteForm):
+    capture_id = forms.UUIDField(
+        required=False, initial=uuid4, widget=forms.HiddenInput
+    )
+
+
+class EditForm(NoteForm):
     revision = forms.IntegerField(
         min_value=1,
         max_value=MAX_EXPECTED_REVISION,

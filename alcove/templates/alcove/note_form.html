@@ -6,13 +6,16 @@
 <h1>{% if note %}Edit note{% else %}Capture a note{% endif %}</h1>
 {% if source_book %}<p>Capturing from <a href="{% url 'book' source_book.id %}">{{ source_book.title }}</a></p>{% endif %}
 <p id="content-help">A thought, a quotation, a sentence. No title or book needed.</p>
-<form method="post" class="panel" data-note-editor data-save-state="{% if save_conflict %}conflict{% elif form.errors %}failed{% else %}saved{% endif %}" data-api-url="{% if note %}{% url 'api-note' note.id %}{% else %}{% url 'api-notes' %}{% endif %}" data-rejected="{% if form.document_rejected or form.content_document.errors %}true{% else %}false{% endif %}">
+<form method="post" class="panel" data-note-editor data-draft-scope="{{ draft_scope }}"{% if form.is_bound %} data-bound{% endif %} data-save-state="{% if save_conflict %}conflict{% elif form.errors %}failed{% else %}saved{% endif %}" data-api-url="{% if note %}{% url 'api-note' note.id %}{% else %}{% url 'api-notes' %}{% endif %}" data-rejected="{% if form.document_rejected or form.content_document.errors %}true{% else %}false{% endif %}">
   {% csrf_token %}
   {% if form.errors %}<div role="alert">Your note has not been saved. Check the message below.</div>{% endif %}
   {{ form.non_field_errors }}
   {{ form.revision.errors }}
   {{ form.revision }}
+  {{ form.capture_id.errors }}
+  {{ form.capture_id }}
   {{ form.content.errors }}
+  {% if not note %}<ul data-other-captures hidden></ul>{% endif %}
   <label id="note-content-label" for="note-editor">Your note</label>
   <div id="formatting-tools" class="formatting-tools" role="group" aria-label="Note formatting" hidden>
     <button type="button" data-command="paragraph" data-format="paragraph">Paragraph</button>

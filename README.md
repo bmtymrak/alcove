@@ -59,8 +59,8 @@ persisted results back through public routes and exercise sessions, CSRF, valida
 pagination, revision conflicts, and a second owner's private Collection. Browser
 tests run a local Django server and Chromium at desktop and phone sizes; they cover
 capture, repeated Book marginalia capture, inline reading, ordering, reload,
-autosave, formatted round trips, website links, retained invalid input and failed
-saves, delayed and lost responses, two-tab conflicts and resolution, and sign-out.
+autosave, formatted round trips, website links, draft recovery, delayed and lost
+responses, two-tab conflicts and resolution, and sign-out.
 For a focused run use `uv run pytest tests/test_notes_http.py` or
 `uv run pytest tests/test_browser.py`. If browser downloads are stored in a custom
 location, set `PLAYWRIGHT_BROWSERS_PATH` for both installation and test runs.
@@ -97,13 +97,15 @@ while saving. Failed requests retain pending content and offer Retry saving.
 Conflicts pause saves: Review current note shows the saved text and source without
 replacing the editor, and Save my version applies the owner's reconciled content
 against that reviewed revision. Open current note opens a separate tab for the
-formatted saved version. Navigation warns while edits remain unconfirmed.
+formatted saved version.
 Without JavaScript, Save changes uses the same revision checks through HTML.
 Creation still requires Save note or Save and add another.
 
-Draft recovery across navigation/reload, retry idempotency, search, Topics, Note
-Links, trash, and portability remain later tickets from Spec #2. Pending editor
-content is retained in the open page; it is not an offline or persistent draft.
+The editor recovers unfinished captures and pending edits after navigation or
+reload in the same tab. Drafts belong to the signed-in Collection and session.
+After an uncertain capture response, retry confirms the same Note using its
+capture UUID. Acknowledged captures clear the draft. Search, Topics, Note Links,
+trash, and portability remain later tickets from Spec #2.
 
 ## Editor assets
 

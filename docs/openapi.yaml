@@ -291,7 +291,23 @@ paths:
       security:
       - cookieAuth: []
       responses:
+        '200':
+          headers:
+            Location:
+              schema:
+                type: string
+              description: Relative URL of the saved Note.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+          description: Replayed capture.
         '201':
+          headers:
+            Location:
+              schema:
+                type: string
+              description: Relative URL of the saved Note.
           content:
             application/json:
               schema:
@@ -327,6 +343,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: Send application/json.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Capture UUID already used for other input.
   /api/v1/notes/{note_id}/:
     get:
       operationId: notes_read
@@ -496,6 +518,11 @@ components:
           - string
           - 'null'
           format: uuid
+        capture_id:
+          type: string
+          format: uuid
+          description: Use a new UUID for each capture. Retry the same content and
+            source with the same UUID to receive the existing Note.
       required:
       - content
     Conflict:

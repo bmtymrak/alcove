@@ -3,6 +3,8 @@ import StarterKit from '@tiptap/starter-kit'
 import { Link } from '@tiptap/extension-link'
 import { OrderedList } from '@tiptap/extension-list'
 import { autosave } from './autosave'
+import { explicitCapture } from './capture'
+import { noteDraft } from './drafts'
 
 const form = document.querySelector('[data-note-editor]')
 if (form) initializeEditor(form)
@@ -24,11 +26,21 @@ function initializeEditor(form) {
   const message = document.querySelector('#editor-error')
   const toolbar = document.querySelector('#formatting-tools')
   const host = document.querySelector('#editor-host')
+  const book = form.querySelector('[name="book"]')
+  const draft = noteDraft(form)
+  const initialBook = book.value || null
   let editor
   let changed = () => {}
   try {
     if (form.dataset.rejected === 'true') throw new Error('Rejected document')
-    const stored = source.value ? JSON.parse(source.value) : { format: 'plain-text', text: plain.value }
+    const recovered = draft.recovered && JSON.parse(draft.recovered.snapshot)
+    const stored = recovered?.content || (source.value
+      ? JSON.parse(source.value)
+      : { format: 'plain-text', text: plain.value })
+    if (recovered) {
+      source.value = JSON.stringify(stored)
+      book.value = recovered.book || ''
+    }
     const content = stored.format === 'tiptap' ? stored.doc : {
       type: 'doc',
       content: stored.text.split('\n').map(text => ({
@@ -71,7 +83,17 @@ function initializeEditor(form) {
       onTransaction: updateToolbar,
     })
   } catch {
-    message.textContent = 'The formatted draft could not be loaded. Its original JSON is retained below; correct it before saving.'
+    if (draft.recovered) {
+      // A native submit would skip acknowledgement of the local draft and
+      // could send a recovered edit with the current server revision.
+      form.querySelectorAll('[data-explicit-save], [name="add_another"]').forEach(button => {
+        button.disabled = true
+      })
+      form.addEventListener('submit', event => event.preventDefault())
+      message.textContent = 'The local draft could not be loaded. Reload to try again, or copy its original JSON below.'
+    } else {
+      message.textContent = 'The formatted draft could not be loaded. Its original JSON is retained below. Correct it before saving.'
+    }
     message.hidden = false
     recovery.open = true
     document.querySelector('#note-content-label').htmlFor = 'id_content'
@@ -130,65 +152,14 @@ function initializeEditor(form) {
     dialog.close()
     editor.commands.focus()
   })
-  let saving = false
-  if (!form.querySelector('[name="revision"]')) form.addEventListener('submit', async event => {
-    event.preventDefault()
-    if (saving) return
-    sync()
-    const payload = {
-      content: JSON.parse(source.value),
-      book: form.querySelector('[name="book"]').value || null,
-    }
-    const controls = form.querySelectorAll('button, select')
-    const status = document.querySelector('#save-status')
-    const another = event.submitter?.name === 'add_another'
-    saving = true
-    let confirmed = false
-    controls.forEach(control => { control.disabled = true })
-    editor.setEditable(false)
-    status.textContent = 'Saving…'
-    message.hidden = true
-    try {
-      const response = await fetch(form.dataset.apiUrl, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': form.querySelector('[name="csrfmiddlewaretoken"]').value,
-        },
-        body: JSON.stringify(payload),
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        message.textContent = result.error.message
-        message.hidden = false
-        status.textContent = response.status === 409 ? 'Conflict. Your draft is still here.' : 'Not saved. Your draft is still here.'
-        return
-      }
-      confirmed = true
-      status.textContent = 'Saved.'
-      window.location.assign(another
-        ? (result.book ? `/books/${result.book}/notes/new/` : '/notes/new/')
-        : `/notes/${result.id}/`)
-    } catch {
-      message.textContent = 'Could not confirm saving. Your draft is still here. Check your connection and saved Notes before retrying.'
-      message.hidden = false
-      status.textContent = 'Save not confirmed.'
-    } finally {
-      if (!confirmed) {
-        saving = false
-        controls.forEach(control => { control.disabled = false })
-        editor.setEditable(true)
-      }
-    }
-  })
   plain.hidden = true
   plain.removeAttribute('autofocus')
   recovery.hidden = true
   host.hidden = false
   toolbar.hidden = false
   sync()
-  if (form.querySelector('[name="revision"]')) changed = autosave(form)
+  if (form.querySelector('[name="revision"]')) changed = autosave(form, draft)
+  else changed = explicitCapture(form, editor, draft, initialBook)
   updateToolbar()
   editor.commands.focus('end')
 }

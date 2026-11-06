@@ -28,7 +28,14 @@ class Note(models.Model):
     captured_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     revision = models.PositiveIntegerField(default=1)
+    capture_id = models.UUIDField(null=True, editable=False)
+    capture_fingerprint = models.CharField(max_length=64, blank=True, editable=False)
 
     class Meta:
         ordering = ["captured_at", "id"]
         indexes = [models.Index(fields=["collection", "captured_at", "id"])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["collection", "capture_id"], name="unique_collection_capture"
+            )
+        ]

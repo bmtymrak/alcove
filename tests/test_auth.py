@@ -25,15 +25,12 @@ def test_provisioned_owner_can_sign_in_and_sign_out(db, monkeypatch):
     assert response.status_code == 302
     assert client.get("/").status_code == 200
     assert client.get("/api/v1/notes/").json()["count"] == 0
-    assert (
-        client.post(
-            "/logout/",
-            {
-                "csrfmiddlewaretoken": client.cookies["csrftoken"].value,
-            },
-        ).status_code
-        == 302
+    logout = client.post(
+        "/logout/",
+        {"csrfmiddlewaretoken": client.cookies["csrftoken"].value},
     )
+    assert logout.status_code == 302
+    assert logout["Clear-Site-Data"] == '"storage"'
     assert client.get("/").status_code == 302
     assert client.get("/api/v1/notes/").status_code == 403
 

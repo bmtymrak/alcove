@@ -1,5 +1,7 @@
+import { noteSnapshot } from './drafts'
+
 // Existing Notes use revision-checked saves; creation remains an explicit action.
-export function autosave(form) {
+export function autosave(form, draft) {
   const revision = form.querySelector('[name="revision"]')
   const book = form.querySelector('[name="book"]')
   const status = form.querySelector('#save-status')
@@ -8,13 +10,17 @@ export function autosave(form) {
   const review = form.querySelector('[data-review-conflict]')
   const conflict = form.querySelector('#save-conflict')
   const resolve = form.querySelector('[data-resolve-conflict]')
-  const snapshot = () => JSON.stringify({
-    content: JSON.parse(form.querySelector('[name="content_document"]').value),
-    book: book.value || null,
-  })
+  const snapshot = () => noteSnapshot(form)
   let blocked = form.dataset.saveState === 'saved' ? null : form.dataset.saveState
   let saved = blocked ? null : snapshot()
+  if (draft.recovered) {
+    const currentRevision = Number(revision.value)
+    revision.value = draft.recovered.revision
+    blocked = currentRevision === draft.recovered.revision ? draft.recovered.blocked : 'conflict'
+    saved = null
+  }
   let saving = false
+  let persisted = true
   let timer
   let reviewedRevision
 
@@ -30,6 +36,7 @@ export function autosave(form) {
 
   function changed() {
     clearTimeout(timer)
+    persist()
     if (blocked) return
     if (snapshot() === saved && !saving) {
       showState('saved')
@@ -37,6 +44,13 @@ export function autosave(form) {
     }
     showState('saving')
     timer = setTimeout(save, 500)
+  }
+
+  function persist() {
+    const pending = snapshot()
+    persisted = draft.write(pending === saved && !saving ? null : {
+      snapshot: pending, revision: Number(revision.value), blocked,
+    })
   }
 
   async function save() {
@@ -48,6 +62,7 @@ export function autosave(form) {
       return
     }
     saving = true
+    persist()
     showState('saving')
     message.hidden = true
     try {
@@ -85,6 +100,7 @@ export function autosave(form) {
       showState(blocked)
     } finally {
       saving = false
+      persist()
       // A response only confirms the snapshot sent, never text typed while waiting.
       if (!blocked && snapshot() !== saved) void save()
     }
@@ -127,12 +143,13 @@ export function autosave(form) {
   })
   book.addEventListener('change', changed)
   window.addEventListener('beforeunload', event => {
-    if (snapshot() !== saved || saving) {
+    if (!persisted && (snapshot() !== saved || saving)) {
       event.preventDefault()
       event.returnValue = ''
     }
   })
   form.querySelector('[data-explicit-save]').hidden = true
   showState(blocked || 'saved')
+  if (draft.recovered || blocked) changed()
   return changed
 }

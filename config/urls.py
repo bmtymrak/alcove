@@ -1,4 +1,4 @@
-from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.views import LoginView
 from django.urls import path
 from drf_spectacular.views import SpectacularAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -7,7 +7,7 @@ from alcove import api, views
 
 urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
-    path("logout/", LogoutView.as_view(), name="logout"),
+    path("logout/", views.SignOutView.as_view(), name="logout"),
     path("", views.index, name="index"),
     path("books/<uuid:book_id>/notes/new/", views.capture, name="book-capture"),
     path(

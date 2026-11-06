@@ -387,3 +387,166 @@ def test_emphasis_across_a_line_break_round_trips(page, live_server, owner):
     expect(page.get_by_role("status")).to_have_text("Saved.")
     page.goto(page.url.removesuffix("edit/"))
     expect(page.locator(".note-content br")).to_have_count(1)
+
+
+def sign_in(page, live_server):
+    page.goto(live_server.url + "/login/")
+    page.get_by_label("Username").fill("reader")
+    page.get_by_label("Password").fill(PASSWORD)
+    page.get_by_role("button", name="Sign in", exact=True).click()
+
+
+def test_capture_recovers_formatting_and_source_after_navigation_and_reload(
+    page, live_server
+):
+    sign_in(page, live_server)
+    page.get_by_role("link", name="Add a book", exact=True).click()
+    page.get_by_label("Title").fill("A source for later")
+    page.get_by_role("button", name="Save book", exact=True).click()
+    page.goto(live_server.url + "/notes/new/")
+    source = page.get_by_label("Source book")
+    source.select_option(label="A source for later")
+    editor = page.get_by_label("Your note")
+    editor.fill("An unfinished quotation.")
+    editor.press("ControlOrMeta+a")
+    page.get_by_role("button", name="Quotation", exact=True).click()
+
+    page.get_by_role("link", name="Books", exact=True).click()
+    page.get_by_role("link", name="Capture a note", exact=True).click()
+    page.reload()
+    expect(editor.locator("blockquote")).to_have_text("An unfinished quotation.")
+    expect(source.locator("option:checked")).to_have_text("A source for later")
+    assert page.request.get(live_server.url + "/api/v1/notes/").json()["count"] == 0
+
+
+def test_lost_book_capture_response_can_be_retried_after_reload(page, live_server):
+    sign_in(page, live_server)
+    page.get_by_role("link", name="Add a book", exact=True).click()
+    page.get_by_label("Title").fill("A Book of marginalia")
+    page.get_by_role("button", name="Save book", exact=True).click()
+    book_url = page.url
+    page.get_by_role("link", name="Capture a note from this book").click()
+    capture_url = page.url
+    source = page.get_by_label("Source book")
+    selected_book = source.input_value()
+    editor = page.get_by_label("Your note")
+    another = page.get_by_role("button", name="Save and add another", exact=True)
+
+    def lose_acknowledgement(route):
+        assert route.fetch().status == 201
+        route.abort("failed")
+
+    endpoint = "**/api/v1/notes/"
+    page.route(endpoint, lose_acknowledgement)
+    editor.fill("A quotation worth repeating.")
+    another.click()
+    expect(page.get_by_role("status")).to_have_text("Save not confirmed.")
+    expect(page).to_have_url(capture_url)
+    expect(editor).to_have_text("A quotation worth repeating.")
+    expect(source).to_have_value(selected_book)
+
+    page.reload()
+    expect(editor).to_have_text("A quotation worth repeating.")
+    expect(source).to_have_value(selected_book)
+    page.unroute(endpoint)
+    another.click()
+    expect(editor).to_have_text("")
+    expect(source).to_have_value(selected_book)
+    editor.fill("A quotation worth repeating.")
+    another.click()
+    expect(editor).to_have_text("")
+    expect(source).to_have_value(selected_book)
+
+    page.goto(book_url)
+    expect(page.locator(".note-content")).to_have_text(
+        ["A quotation worth repeating.", "A quotation worth repeating."]
+    )
+
+
+@pytest.mark.parametrize("failure", ["validation", "conflict"])
+def test_pending_edits_recover_after_reload_without_replacing_saved_note(
+    page, live_server, failure
+):
+    open_existing_editor(page, live_server)
+    endpoint = "**/api/v1/notes/*/"
+    if failure == "conflict":
+        second_tab = page.context.new_page()
+        second_tab.goto(page.url)
+        second_tab.get_by_label("Your note").fill("The latest saved thought.")
+        expect(second_tab.get_by_role("status")).to_have_text("Saved.")
+        second_tab.close()
+        status = "Conflict. Your draft is still here."
+    else:
+        page.route(
+            endpoint,
+            lambda route: route.fulfill(
+                status=400, json={"error": {"message": "Could not save."}}
+            ),
+        )
+        status = "Not saved. Your draft is still here."
+
+    editor = page.get_by_label("Your note")
+    editor.fill("My pending thought.")
+    expect(page.get_by_role("status")).to_have_text(status)
+    page.unroute(endpoint)
+    page.reload()
+    expect(editor).to_have_text("My pending thought.")
+    expect(page.get_by_role("status")).to_have_text(status)
+
+    if failure == "conflict":
+        page.get_by_role("button", name="Review current note").click()
+        expect(page.locator("[data-current-content]")).to_have_text(
+            "The latest saved thought."
+        )
+        page.get_by_role("button", name="Save my version").click()
+    else:
+        page.get_by_role("button", name="Retry saving").click()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    page.reload()
+    expect(editor).to_have_text("My pending thought.")
+
+
+def test_signing_out_from_another_page_clears_local_drafts(page, live_server):
+    sign_in(page, live_server)
+    page.get_by_role("link", name="Capture a note", exact=True).click()
+    page.get_by_label("Your note").fill("A private capture draft.")
+    page.get_by_role("link", name="Books", exact=True).click()
+    page.get_by_role("button", name="Sign out", exact=True).click()
+    sign_in(page, live_server)
+    page.get_by_role("link", name="Capture a note", exact=True).click()
+    expect(page.get_by_label("Your note")).to_have_text("")
+
+
+def test_switching_books_keeps_each_draft_and_starts_the_next_capture_fresh(
+    page, live_server
+):
+    sign_in(page, live_server)
+    capture_urls = []
+    for title in ("First source", "Second source"):
+        page.get_by_role("link", name="Books", exact=True).click()
+        page.get_by_role("link", name="Add a book", exact=True).click()
+        page.get_by_label("Title").fill(title)
+        page.get_by_role("button", name="Save book", exact=True).click()
+        page.get_by_role("link", name="Capture a note from this book").click()
+        capture_urls.append(page.url)
+        expect(page.get_by_label("Source book").locator("option:checked")).to_have_text(
+            title
+        )
+        expect(page.get_by_label("Your note")).to_have_text("")
+        page.get_by_label("Your note").fill(f"Draft for {title}.")
+
+    page.goto(capture_urls[0])
+    expect(page.get_by_label("Your note")).to_have_text("Draft for First source.")
+    page.get_by_label("Source book").select_option(label="Second source")
+    page.get_by_role("button", name="Save and add another", exact=True).click()
+    expect(page.get_by_label("Your note")).to_have_text("")
+    expect(page.get_by_label("Source book").locator("option:checked")).to_have_text(
+        "Second source"
+    )
+    page.get_by_label("Your note").fill("A fresh draft for the second source.")
+    page.reload()
+    expect(page.get_by_label("Your note")).to_have_text(
+        "A fresh draft for the second source."
+    )
+    page.get_by_role("link", name="Resume previous capture").click()
+    expect(page.get_by_label("Your note")).to_have_text("Draft for Second source.")

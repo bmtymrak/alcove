@@ -1,4 +1,5 @@
 from typing import Any
+from uuid import UUID
 
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -23,9 +24,23 @@ class ContentField(serializers.JSONField):
         return notes.validated_content(data)[0]
 
 
+class CaptureIdentityField(serializers.UUIDField):
+    def to_internal_value(self, data: Any) -> UUID:
+        if not isinstance(data, str):
+            self.fail("invalid")
+        return super().to_internal_value(data)
+
+
 class CaptureSerializer(StrictSerializer):
     content = ContentField()
     book = serializers.UUIDField(required=False, allow_null=True)
+    capture_id = CaptureIdentityField(
+        required=False,
+        help_text=(
+            "Use a new UUID for each capture. Retry the same content and source "
+            "with the same UUID to receive the existing Note."
+        ),
+    )
 
 
 class RevisionField(serializers.IntegerField):
@@ -35,8 +50,9 @@ class RevisionField(serializers.IntegerField):
         return super().to_internal_value(data)
 
 
-class EditSerializer(CaptureSerializer):
+class EditSerializer(StrictSerializer):
     content = ContentField(required=False)
+    book = serializers.UUIDField(required=False, allow_null=True)
     revision = RevisionField(
         min_value=1,
         max_value=notes.MAX_EXPECTED_REVISION,

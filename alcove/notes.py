@@ -1,4 +1,6 @@
+import json
 from enum import Enum
+from hashlib import sha256
 from typing import Any
 from uuid import UUID
 
@@ -67,15 +69,44 @@ def validated_book(collection: Collection, book_id: UUID | None) -> UUID | None:
     return book_id
 
 
-def capture(collection: Collection, content: Any, book: UUID | None = None) -> Note:
+def capture(
+    collection: Collection,
+    content: Any,
+    book: UUID | None = None,
+    capture_id: UUID | None = None,
+) -> tuple[Note, bool]:
     document, text = validated_content(content)
-    book_id = validated_book(collection, book)
-    return Note.objects.create(
-        collection=collection,
-        book_id=book_id,
-        content=document,
-        plain_text=text,
-    )
+    fields = {
+        "content": document,
+        "plain_text": text,
+    }
+    if capture_id is None:
+        return Note.objects.create(
+            collection=collection, book_id=validated_book(collection, book), **fields
+        ), True
+
+    # Compare against the original input, even if the saved Note has been edited.
+    original_input = json.dumps([str(book) if book else None, document], sort_keys=True)
+    fingerprint = sha256(original_input.encode()).hexdigest()
+    captures = Note.objects.filter(collection=collection, capture_id=capture_id)
+    note = captures.first()
+    created = False
+    if note is None:
+        book_id = validated_book(collection, book)
+        # The unique constraint arbitrates simultaneous retries. get_or_create
+        # reads outside its insert transaction, avoiding a SQLite lock upgrade.
+        note, created = Note.objects.get_or_create(
+            collection=collection,
+            capture_id=capture_id,
+            defaults={**fields, "book_id": book_id, "capture_fingerprint": fingerprint},
+        )
+    if note.capture_fingerprint != fingerprint:
+        raise NoteError(
+            "This capture identity was already used for different input.",
+            code="capture_conflict",
+            status=409,
+        )
+    return note, created
 
 
 def edit(

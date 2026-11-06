@@ -67,16 +67,33 @@ class NotesView(APIView):
     @extend_schema(
         operation_id="notes_capture",
         request=CaptureSerializer,
-        responses={201: NoteSerializer, **WRITE_ERRORS},
+        parameters=[
+            OpenApiParameter(
+                "Location",
+                str,
+                location=OpenApiParameter.HEADER,
+                response=[200, 201],
+                description="Relative URL of the saved Note.",
+            ),
+        ],
+        responses={
+            200: OpenApiResponse(NoteSerializer, description="Replayed capture."),
+            201: NoteSerializer,
+            **WRITE_ERRORS,
+            409: OpenApiResponse(
+                ErrorSerializer,
+                description="Capture UUID already used for other input.",
+            ),
+        },
     )
     def post(self, request: Request) -> Response:
         collection = collections.for_owner(request.user)
         payload = CaptureSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
-        note = notes.capture(collection, **payload.validated_data)
+        note, created = notes.capture(collection, **payload.validated_data)
         return Response(
             NoteSerializer(note).data,
-            status=201,
+            status=201 if created else 200,
             headers={
                 "Location": reverse("api-note", kwargs={"note_id": note.id}),
             },

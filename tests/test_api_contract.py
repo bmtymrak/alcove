@@ -223,3 +223,21 @@ def test_formatted_content_contract_matches_both_deliveries(signed_in):
     )
     validate_response(invalid, DETAIL, "patch", 400)
     assert set(invalid.json()["error"]["fields"]) == {"content"}
+
+
+def test_capture_retry_contract_matches_real_responses(signed_in):
+    payload = {
+        "content": document("A documented retry."),
+        "capture_id": "083e06ee-785a-4110-8b5e-02d46aa85fd4",
+    }
+    validate_request(payload, COLLECTION, "post")
+    response = json_request(signed_in, "post", COLLECTION, payload)
+    validate_response(response, COLLECTION, "post", 201)
+    replay = json_request(signed_in, "post", COLLECTION, payload)
+    validate_response(replay, COLLECTION, "post", 200)
+    assert replay["Location"] == response["Location"]
+    conflict = json_request(
+        signed_in, "post", COLLECTION, {**payload, "content": document("Other input.")}
+    )
+    validate_response(conflict, COLLECTION, "post", 409)
+    assert conflict.json()["error"]["code"] == "capture_conflict"

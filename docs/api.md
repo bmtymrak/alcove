@@ -21,7 +21,7 @@ checks schema drift and validates real request/response examples against it.
 | Edit Book metadata | `PATCH /api/v1/books/{uuid}/` | `200` |
 | Read a Book's Notes | `GET /api/v1/books/{uuid}/notes/?order=oldest&page=1` | `200` |
 | List Notes | `GET /api/v1/notes/?page=1` | `200` |
-| Capture a Note | `POST /api/v1/notes/` | `201`, with a relative `Location` header |
+| Capture a Note | `POST /api/v1/notes/` | `201` on creation or `200` on replay, both with a relative `Location` header |
 | Read a Note | `GET /api/v1/notes/{uuid}/` | `200` |
 | Edit a Note (including autosave) | `PATCH /api/v1/notes/{uuid}/` | `200` |
 
@@ -40,6 +40,17 @@ Capture body:
 
 Capture may also include `"book": "<book-uuid>"`; omission or null creates a
 standalone Note. Each Note has at most one source Book.
+
+Send an optional `"capture_id": "<uuid>"` to make a capture safe to retry.
+Generate a fresh UUID for each new capture, even when two Notes have identical
+content and source. After a timeout or lost response, resend the same UUID,
+document, and source. The first successful request creates the Note and returns
+`201`. A replay returns `200` and the current representation of the same Note,
+including any later edits. Both responses include its `Location`. The identity
+is scoped to the signed-in Collection. Reusing it there with different content or
+source returns `409` with `error.code = "capture_conflict"` and leaves the Note
+intact. Invalid requests do not reserve identities. Omitting the UUID requests a
+new Note on every successful POST. Capture identities are accepted only on create.
 
 An edit sends the last-read `revision` and the fields to change. Content, when
 sent, replaces the complete document:
@@ -152,7 +163,7 @@ Errors use the following envelope (field values may be nested for document error
 | `403` | Sign-in required (`not_authenticated`) or failed CSRF (`permission_denied`). |
 | `404` | Book, Note, order, or page not found in the current Collection (`not_found`). |
 | `405` | Unsupported method (`method_not_allowed`). |
-| `409` | Stale revision (`conflict`); content was not changed. |
+| `409` | Stale edit revision (`conflict`) or capture UUID reused for different input (`capture_conflict`). |
 | `415` | Unsupported request media type (`unsupported_media_type`). |
 
 Revision conflicts have this additional required field:
@@ -166,12 +177,9 @@ overwrite it. Retain pending content after errors. For `409`, GET the latest Not
 and let the owner review its content and source and reconcile the changes before
 submitting with its revision. A concurrent change after review still returns
 `409`. Every rejected edit leaves content, source, revision, and timestamps intact.
-Retrying an edit
-with an already-consumed revision produces a conflict. Capture idempotency is not
-delivered yet: repeating a successful POST creates another Note, so after an
-ambiguous network result inspect the Collection before resubmitting. Never infer
-successful saving from a timeout. Restore preview/confirmation and other operations
-will be documented with their delivery tickets.
+Retrying an edit with an already-consumed revision produces a conflict.
+Restore preview/confirmation and other operations will be documented with their
+delivery tickets.
 
 The signed-in HTML start page is the Book library at `/`. `/notes/` still lists
 all Notes, including standalone Notes. `/books/new/` adds a Book and
@@ -192,7 +200,10 @@ An empty document returns `"Write something before saving."`. Invalid content
 never creates a Note or changes existing content, revision, or timestamps.
 
 Enhanced forms send the canonical document through the JSON API with CSRF. Capture
-is explicit and navigates only after a confirmed successful response. Existing-note
+is explicit and navigates only after a confirmed successful response. The browser
+keeps the submitted document, source, and capture UUID together until it can
+confirm an uncertain result. Retry uses that same input. Save and add another
+starts a fresh capture with the submitted Book selected. Existing-note
 content and source edits autosave after 500 ms of inactivity, serialize requests,
 and remain in the editor. A successful response confirms only the snapshot sent;
 newer edits remain pending until their own save succeeds. Saving, saved, failed,
@@ -205,16 +216,27 @@ Conflicts pause autosave. Review current note fetches the current text, source,
 and revision without replacing pending content. The owner can reconcile in the
 editor and explicitly Save my version against the reviewed revision; another
 concurrent edit still conflicts. Open current note opens the formatted saved
-version in another tab. Navigating away with unconfirmed edits triggers the
-browser's unsaved-changes warning. Local draft recovery across navigation/reload
-is not yet delivered.
+version in another tab.
+
+Each browser tab stores unfinished captures by entry point and pending edits by
+Note in session storage. Opening a different Book's capture keeps its own source
+preselection. If Save and add another starts a fresh capture at an entry point
+with an unfinished draft, the capture page links to the other draft. Drafts
+survive navigation and reload in the tab. Pending
+edits keep their last confirmed revision so that reopening the editor can detect
+intervening changes. When storage is unavailable the editor warns before leaving
+with pending input. Drafts are scoped to the Collection and sign-in session.
+Sign-out requests that the browser clear site storage, and a subsequent sign-in
+cannot recover the previous session's drafts. Drafts are local to the tab and do
+not sync across devices.
 
 Native HTML form posts accept the same document serialized in the
 `content_document` field, with the same validation rules; an empty/omitted field
 uses legacy plain text from `content`. Invalid JSON and rejected documents remain
 in the recovery field, escaped, instead of being stripped or replaced. The plain
 text field for an existing formatted Note is read-only without the editor, so a
-source-only edit preserves the canonical document. Authentication redirects and
+source-only edit preserves the canonical document. Native capture forms also carry
+a hidden `capture_id` and support resubmitting the same input. Authentication redirects and
 HTML form errors are specific to the HTML path; JSON errors use the envelope
 above for matched API operations. Explicit HTML edits also require the last-read
 `revision` hidden field and return `409` with pending input retained on conflicts;
