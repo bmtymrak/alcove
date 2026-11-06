@@ -1,5 +1,5 @@
 import pytest
-from conftest import PASSWORD
+from conftest import PASSWORD, document
 from playwright.sync_api import expect, sync_playwright
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -745,6 +745,7 @@ def test_browse_topic_modes_and_autosave_a_grouped_note(page, live_server):
     picker.fill("Science")
     page.get_by_role("button", name="Science", exact=True).click()
     page.get_by_role("button", name="Save note", exact=True).click()
+    expect(page.get_by_role("heading", name="Your note")).to_be_visible()
 
     page.get_by_role("link", name="Topics", exact=True).click()
     tree = page.get_by_role("region", name="Topic tree")
@@ -917,3 +918,111 @@ def test_find_follow_and_remove_a_related_note_in_browser(page, live_server):
     expect(reverse_link).to_have_count(0)
     page.goto(first_url)
     expect(page.get_by_text("No related Notes yet.")).to_be_visible()
+
+
+def test_trash_restore_and_permanently_delete_a_linked_note_on_phone(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(live_server.url + "/login/")
+    page.get_by_label("Username").fill("reader")
+    page.get_by_label("Password").fill(PASSWORD)
+    page.get_by_role("button", name="Sign in", exact=True).click()
+    token = next(c["value"] for c in page.context.cookies() if c["name"] == "csrftoken")
+
+    def create(path, **fields):
+        response = page.request.post(
+            live_server.url + "/api/v1/" + path,
+            data=fields,
+            headers={"X-CSRFToken": token},
+        )
+        assert response.status == 201
+        return response.json()["id"]
+
+    book = create("books/", title="Collected essays")
+    chapter = create(f"books/{book}/chapters/", label="Prologue")
+    topics = [
+        create("topics/", label="Memory", parent=create("topics/", label="Ideas")),
+        create("topics/", label="Essays", parent=create("topics/", label="Writing")),
+    ]
+    original = "An observation to recover."
+    note = create(
+        "notes/",
+        content=document(original),
+        book=book,
+        chapter=chapter,
+        topic_changes=[{"action": "assign", "topic": topic} for topic in topics],
+    )
+    related = create("notes/", content=document("A related observation."))
+    create_link = page.request.post(
+        live_server.url + f"/api/v1/notes/{related}/links/",
+        data={"related_note": note},
+        headers={"X-CSRFToken": token},
+    )
+    assert create_link.status == 201
+
+    page.goto(live_server.url + f"/notes/{related}/")
+    note_link = page.get_by_role("link", name=original, exact=True)
+    note_link.click()
+    page.get_by_role("button", name="Move to trash").click()
+    expect(page.get_by_role("heading", name="Trash")).to_be_visible()
+    expect(page.get_by_text(original)).to_be_visible()
+    page.goto(live_server.url + f"/notes/{related}/")
+    expect(note_link).to_have_count(0)
+
+    page.get_by_role("link", name="Trash", exact=True).click()
+    page.get_by_role("button", name="Restore note").click()
+    expect(page.get_by_text("Chapter: Prologue")).to_be_visible()
+    expect(page.get_by_role("link", name="Ideas › Memory")).to_be_visible()
+    expect(page.get_by_role("link", name="Writing › Essays")).to_be_visible()
+    expect(page.get_by_role("link", name="A related observation.")).to_be_visible()
+
+    page.get_by_role("button", name="Move to trash").click()
+    page.get_by_role("link", name="Delete permanently…").click()
+    expect(page.get_by_text(original)).to_be_visible()
+    page.get_by_role("link", name="Cancel").click()
+    expect(page.get_by_text(original)).to_be_visible()
+    page.get_by_role("link", name="Delete permanently…").click()
+
+    other_tab = page.context.new_page()
+    other_tab.goto(live_server.url + "/notes/trash/")
+    other_tab.get_by_role("button", name="Restore note").click()
+    other_tab.get_by_role("button", name="Move to trash").click()
+    page.get_by_role("button", name="Delete permanently", exact=True).click()
+    expect(
+        page.get_by_role("heading", name="This Note changed after you opened it.")
+    ).to_be_visible()
+    page.get_by_role("link", name="Open trash").click()
+    expect(page.get_by_text(original)).to_be_visible()
+
+    page.get_by_role("link", name="Delete permanently…").click()
+    page.get_by_role("button", name="Delete permanently", exact=True).click()
+    expect(page.get_by_text("Trash is empty.")).to_be_visible()
+    page.goto(live_server.url + f"/notes/{related}/")
+    expect(note_link).to_have_count(0)
+
+
+def test_autosave_retains_pending_edits_while_note_is_in_trash(page, live_server):
+    open_existing_editor(page, live_server)
+    detail = page.url.removesuffix("edit/")
+    other_tab = page.context.new_page()
+    other_tab.goto(detail)
+    other_tab.get_by_role("button", name="Move to trash").click()
+
+    editor = page.get_by_label("Your note")
+    editor.fill("A pending edit from another tab.")
+    expect(page.get_by_role("status")).to_have_text(
+        "Not saved. Your draft is still here."
+    )
+    expect(editor).to_have_text("A pending edit from another tab.")
+
+    other_tab.get_by_role("button", name="Restore note").click()
+    expect(other_tab.get_by_text("Original thought.")).to_be_visible()
+    page.get_by_role("button", name="Retry saving").click()
+    expect(page.get_by_role("status")).to_have_text(
+        "Conflict. Your draft is still here."
+    )
+    page.get_by_role("button", name="Review current note").click()
+    expect(page.locator("[data-current-content]")).to_have_text("Original thought.")
+    page.get_by_role("button", name="Save my version").click()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    page.reload()
+    expect(editor).to_have_text("A pending edit from another tab.")

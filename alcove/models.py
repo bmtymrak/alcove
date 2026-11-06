@@ -49,6 +49,7 @@ class Note(models.Model):
     plain_text = models.TextField()
     captured_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    trashed_at = models.DateTimeField(null=True, blank=True, editable=False)
     revision = models.PositiveIntegerField(default=1)
     capture_id = models.UUIDField(null=True, editable=False)
     capture_fingerprint = models.CharField(max_length=64, blank=True, editable=False)
@@ -59,6 +60,18 @@ class Note(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["collection", "capture_id"], name="unique_collection_capture"
+            )
+        ]
+
+
+class RetiredCapture(models.Model):
+    collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
+    capture_id = models.UUIDField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["collection", "capture_id"], name="unique_retired_capture"
             )
         ]
 

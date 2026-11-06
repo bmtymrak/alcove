@@ -49,6 +49,15 @@ WRITE_ERRORS = {
     400: OpenApiResponse(ErrorSerializer, description="Invalid fields or JSON."),
     415: OpenApiResponse(ErrorSerializer, description="Send application/json."),
 }
+LIFECYCLE_ERRORS = {
+    **WRITE_ERRORS,
+    409: OpenApiResponse(ErrorSerializer, description="Note is in the wrong state."),
+}
+
+
+def validate_lifecycle_request(request: Request) -> None:
+    if request.data != {}:
+        raise notes.NoteError("Note lifecycle actions accept no request fields.")
 
 
 def page_response(page: Page[Any], serializer: type[Serializer]) -> Response:
@@ -97,7 +106,9 @@ class NotesView(APIView):
             **WRITE_ERRORS,
             409: OpenApiResponse(
                 ErrorSerializer,
-                description="Capture UUID already used for other input.",
+                description=(
+                    "Capture UUID already used for other input or a deleted Note."
+                ),
             ),
         },
     )
@@ -144,6 +155,62 @@ class NoteView(APIView):
         payload.is_valid(raise_exception=True)
         note = notes.edit(collection, note_id, **payload.validated_data)
         return Response(NoteSerializer(note).data)
+
+    @extend_schema(
+        operation_id="notes_trash",
+        description="Move an active Note to trash, retaining its associations.",
+        responses={204: None, **LIFECYCLE_ERRORS},
+    )
+    def delete(self, request: Request, note_id: UUID) -> Response:
+        validate_lifecycle_request(request)
+        notes.set_trashed(collections.for_owner(request.user), note_id, trashed=True)
+        return Response(status=204)
+
+
+class NoteTrashView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="notes_trash_list",
+        parameters=[
+            OpenApiParameter("page", int, description="1-based page; 20 Notes."),
+        ],
+        responses={200: NotePageSerializer, **ERRORS},
+    )
+    def get(self, request: Request) -> Response:
+        page = reading.trash(
+            collections.for_owner(request.user), request.query_params.get("page", "1")
+        )
+        return page_response(page, NoteSerializer)
+
+
+class NoteRestoreView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="notes_restore",
+        description="Restore a trashed Note with its surviving associations.",
+        request=None,
+        responses={204: None, **LIFECYCLE_ERRORS},
+    )
+    def post(self, request: Request, note_id: UUID) -> Response:
+        validate_lifecycle_request(request)
+        notes.set_trashed(collections.for_owner(request.user), note_id, trashed=False)
+        return Response(status=204)
+
+
+class NotePermanentDeletionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="notes_delete_permanently",
+        description="Permanently delete a trashed Note and remove its Note Links.",
+        responses={204: None, **LIFECYCLE_ERRORS},
+    )
+    def delete(self, request: Request, note_id: UUID) -> Response:
+        validate_lifecycle_request(request)
+        notes.delete_permanently(collections.for_owner(request.user), note_id)
+        return Response(status=204)
 
 
 class NoteLinkCandidatesView(APIView):

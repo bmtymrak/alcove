@@ -558,7 +558,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: Capture UUID already used for other input.
+          description: Capture UUID already used for other input or a deleted Note.
   /api/v1/notes/{note_id}/:
     get:
       operationId: notes_read
@@ -660,6 +660,113 @@ paths:
               schema:
                 $ref: '#/components/schemas/Conflict'
           description: Stale revision; no change. Review the current Note via GET.
+    delete:
+      operationId: notes_trash
+      description: Move an active Note to trash, retaining its associations.
+      parameters:
+      - in: path
+        name: note_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - notes
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Note is in the wrong state.
+  /api/v1/notes/{note_id}/delete-permanently/:
+    delete:
+      operationId: notes_delete_permanently
+      description: Permanently delete a trashed Note and remove its Note Links.
+      parameters:
+      - in: path
+        name: note_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - notes
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Note is in the wrong state.
   /api/v1/notes/{note_id}/link-candidates/:
     get:
       operationId: note_link_candidates
@@ -850,6 +957,98 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: Note or Note Link not found.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+  /api/v1/notes/{note_id}/restore/:
+    post:
+      operationId: notes_restore
+      description: Restore a trashed Note with its surviving associations.
+      parameters:
+      - in: path
+        name: note_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - notes
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Note is in the wrong state.
+  /api/v1/notes/trash/:
+    get:
+      operationId: notes_trash_list
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page; 20 Notes.
+      tags:
+      - notes
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotePage'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
         '405':
           content:
             application/json:
@@ -1647,10 +1846,16 @@ components:
         updated_at:
           type: string
           format: date-time
+        trashed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Null when active, otherwise when moved to trash.
         revision:
           type: integer
           minimum: 1
-          description: Current saved revision; increases on each successful edit.
+          description: Current saved revision; increases on edits and lifecycle changes.
       required:
       - book
       - captured_at
@@ -1663,6 +1868,7 @@ components:
       - revision
       - source_reference
       - topics
+      - trashed_at
       - updated_at
     NoteBlock:
       oneOf:
@@ -1958,10 +2164,16 @@ components:
         updated_at:
           type: string
           format: date-time
+        trashed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Null when active, otherwise when moved to trash.
         revision:
           type: integer
           minimum: 1
-          description: Current saved revision; increases on each successful edit.
+          description: Current saved revision; increases on edits and lifecycle changes.
         book_title:
           type:
           - string
@@ -1979,6 +2191,7 @@ components:
       - revision
       - source_reference
       - topics
+      - trashed_at
       - updated_at
     RelatedNotePage:
       type: object
@@ -2048,6 +2261,8 @@ components:
           format: uuid
         note_excerpt:
           type: string
+        note_trashed:
+          type: boolean
         topic:
           $ref: '#/components/schemas/Topic'
         ancestor:
@@ -2059,6 +2274,7 @@ components:
       - ancestor
       - note
       - note_excerpt
+      - note_trashed
       - topic
     TopicChangeRequest:
       type: object

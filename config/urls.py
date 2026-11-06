@@ -25,6 +25,7 @@ urlpatterns = [
     path("books/<uuid:book_id>/", views.book_detail, name="book"),
     path("books/<uuid:book_id>/edit/", views.book_form, name="book-edit"),
     path("notes/", views.note_list, name="notes"),
+    path("notes/trash/", views.note_trash, name="note-trash"),
     path("topics/", views.topic_tree, name="topic-tree"),
     path("topics/<uuid:topic_id>/", views.topic_detail, name="topic"),
     path("topics/<uuid:topic_id>/rename/", views.topic_rename, name="topic-rename"),
@@ -83,6 +84,23 @@ urlpatterns = [
     path("notes/<uuid:note_id>/", views.detail, name="note"),
     path("notes/<uuid:note_id>/edit/", views.edit, name="edit"),
     path(
+        "notes/<uuid:note_id>/trash/",
+        views.change_note_state,
+        {"trashed": True},
+        name="trash-note",
+    ),
+    path(
+        "notes/<uuid:note_id>/restore/",
+        views.change_note_state,
+        {"trashed": False},
+        name="restore-note",
+    ),
+    path(
+        "notes/<uuid:note_id>/delete-permanently/",
+        views.delete_note_permanently,
+        name="delete-note-permanently",
+    ),
+    path(
         "notes/<uuid:note_id>/link/",
         views.note_link_picker,
         name="note-link-picker",
@@ -93,7 +111,18 @@ urlpatterns = [
         name="remove-note-link",
     ),
     path("api/v1/notes/", api.NotesView.as_view(), name="api-notes"),
+    path("api/v1/notes/trash/", api.NoteTrashView.as_view(), name="api-note-trash"),
     path("api/v1/notes/<uuid:note_id>/", api.NoteView.as_view(), name="api-note"),
+    path(
+        "api/v1/notes/<uuid:note_id>/restore/",
+        api.NoteRestoreView.as_view(),
+        name="api-restore-note",
+    ),
+    path(
+        "api/v1/notes/<uuid:note_id>/delete-permanently/",
+        api.NotePermanentDeletionView.as_view(),
+        name="api-delete-note-permanently",
+    ),
     path(
         "api/v1/notes/<uuid:note_id>/link-candidates/",
         api.NoteLinkCandidatesView.as_view(),

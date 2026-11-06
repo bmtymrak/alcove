@@ -37,10 +37,14 @@ checks schema drift and validates real request/response examples against it.
 | Move a Topic | `POST /api/v1/topics/{uuid}/move/` | `200`, with the updated Topic |
 | Preview a Topic removal | `POST /api/v1/topics/{uuid}/remove/preview/` | `200`, with a confirmation token |
 | Remove a Topic | `POST /api/v1/topics/{uuid}/remove/` | `204` |
-| List Notes | `GET /api/v1/notes/?page=1` | `200` |
+| List active Notes | `GET /api/v1/notes/?page=1` | `200` |
 | Capture a Note | `POST /api/v1/notes/` | `201` on creation or `200` on replay, both with a relative `Location` header |
 | Read a Note | `GET /api/v1/notes/{uuid}/` | `200` |
 | Edit a Note (including autosave) | `PATCH /api/v1/notes/{uuid}/` | `200` |
+| Move a Note to trash | `DELETE /api/v1/notes/{uuid}/` | `204` |
+| List trashed Notes | `GET /api/v1/notes/trash/?page=1` | `200` |
+| Restore a Note | `POST /api/v1/notes/{uuid}/restore/` | `204` |
+| Permanently delete a trashed Note | `DELETE /api/v1/notes/{uuid}/delete-permanently/` | `204` |
 | Find a Note to link | `GET /api/v1/notes/{note_id}/link-candidates/?q=essay&page=1` | `200` |
 | List a Note's related Notes | `GET /api/v1/notes/{note_id}/links/?page=1` | `200` |
 | Link two Notes | `POST /api/v1/notes/{note_id}/links/` | `201` |
@@ -95,6 +99,10 @@ is scoped to the signed-in Collection. Reusing it there with different content, 
 Topic operations returns `409` with `error.code = "capture_conflict"` and leaves the Note
 intact. Invalid requests do not reserve identities. Omitting the UUID requests a
 new Note on every successful POST. Capture identities are accepted only on create.
+A replay while the Note is in trash or after permanent deletion also returns
+`409 capture_conflict`. The server retains only the Collection-scoped capture
+UUID after permanent deletion so a delayed retry cannot recreate the Note.
+A restored Note can confirm a replay with the original input again.
 
 An edit sends the last-read `revision` and the fields to change. Content, when
 sent, replaces the complete document:
@@ -115,7 +123,8 @@ Book and an unknown Book both produce a `400` field error on `book` without savi
 A Note response has `id` (stable UUID), `book` and `chapter` (UUIDs or null),
 `chapter_label` (the current label or null), `page_number`
 (integer or null), `source_reference` (string), `content` (canonical document), `plain_text`
-(derived text), `captured_at` and `updated_at` (UTC ISO 8601), and `revision`
+(derived text), `captured_at` and `updated_at` (UTC ISO 8601), `trashed_at`
+(UTC ISO 8601 or null), and `revision`
 (positive integer starting at 1). Editing preserves identity and capture time and
 increments the revision atomically. There is no caller-supplied ownership field;
 every lookup and change uses the session owner's Collection. Another owner's UUID
@@ -125,6 +134,33 @@ Edit revisions must be JSON integers between 1 and 9223372036854775806 (strings,
 booleans, floating-point values, and omitted revisions are rejected), leaving room
 for the increment in SQLite storage. Out-of-range preconditions are field errors
 (`400`) and do not change the Note.
+
+## Note lifecycle
+
+Active Notes have a null `trashed_at`. Ordinary Note reads and edits, Book lists
+and groups, Topic lists, related Notes, and the link picker use active Notes.
+An unavailable source Note returns `404`. Creating a Note Link to a trashed
+target returns the same `400` field error as an unknown target.
+
+Moving an active Note to trash sets `trashed_at` and keeps its content, source,
+Topic Assignments, and Note Links. Trash is owner-scoped and uses the standard
+20-Note pagination envelope, most recently trashed first with descending UUID
+as the tiebreaker. Notes stay in trash until the owner acts.
+
+Restoring clears `trashed_at` and returns the same Note to ordinary reading with
+its surviving associations. Trashing and restoring each advance the revision
+and update `updated_at` so an editor opened before the change cannot silently
+save a stale draft. Permanent deletion removes the Note, its Topic Assignments,
+and every Note Link involving it. Other Notes and their remaining links survive.
+
+Lifecycle mutations take no request fields. Omit the body or send an empty
+JSON object. Malformed JSON and unexpected fields return `400`.
+For an owned Note in the wrong state, including a repeated trash or restore,
+the API returns `409 invalid_note_state`. Unknown, permanently deleted, and
+foreign Note UUIDs return `404 not_found`. Rejected actions leave the
+Collection unchanged. In HTML, open **Trash** to restore or review and confirm
+permanent deletion. Mutations use CSRF-protected forms. If the Note changes
+after you open the permanent deletion page, reopen it to confirm again.
 
 ## Note Links
 
@@ -211,7 +247,8 @@ move with them. Sibling label collisions block promotion. Use
 
 Preview responses list affected `topics` with their current representation and
 `new_path`. A null `new_path` marks a Topic for removal. Each affected
-assignment includes a `note` UUID, a short `note_excerpt`, and its assigned
+assignment includes a `note` UUID, a short `note_excerpt`, a `note_trashed`
+flag, and its assigned
 `topic`. Move previews pair each conflicting descendant assignment with its
 `ancestor` assignment. Removal previews list the assignments to clear.
 
@@ -323,7 +360,8 @@ appearances. A Note with multiple assignments has the same Note UUID and
 revision in every group. Edit it using the regular Note endpoint. The HTML
 Book view offers the same grouping with `?order=topic`.
 
-No search or general Note filters are supported yet.
+The Note Link picker provides the delivered Note search. Collection-wide
+search and general Note filters are planned separately.
 
 ## Errors and safe retries
 
@@ -339,7 +377,7 @@ Errors use the following envelope (field values may be nested for document error
 | `403` | Sign-in required (`not_authenticated`) or failed CSRF (`permission_denied`). |
 | `404` | Book, Chapter, Note, Topic, order, mode, or page not found at the requested route (`not_found`). |
 | `405` | Unsupported method (`method_not_allowed`). |
-| `409` | Stale edit revision (`conflict`) or capture UUID reused for different input (`capture_conflict`). |
+| `409` | Stale edit revision (`conflict`), capture UUID conflict (`capture_conflict`), or wrong lifecycle state (`invalid_note_state`). |
 | `415` | Unsupported request media type (`unsupported_media_type`). |
 
 Revision conflicts have this additional required field:
@@ -354,11 +392,10 @@ and let the owner review its content, source, and Topics and reconcile the chang
 submitting with its revision. A concurrent change after review still returns
 `409`. Every rejected edit preserves content, source, Topics, revision, and timestamps.
 Retrying an edit with an already-consumed revision produces a conflict.
-Restore preview/confirmation and other operations will be documented with their
-delivery tickets.
+Collection export and restore preview/confirmation are planned separately.
 
 The signed-in HTML start page is the Book library at `/`. `/notes/` still lists
-all Notes, including standalone Notes. `/books/new/` adds a Book and
+all active Notes, including standalone Notes. `/books/new/` adds a Book and
 `/books/{uuid}/edit/` edits its metadata. `/books/{uuid}/` reads its Notes inline
 with links to individual Notes. `/books/{uuid}/notes/new/` preselects the Book;
 Save and add another opens a fresh capture with the saved source selected.

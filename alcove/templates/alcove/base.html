@@ -14,6 +14,7 @@
       <a href="{% url 'index' %}">Books</a>
       <a href="{% url 'notes' %}">All notes</a>
       <a href="{% url 'topic-tree' %}">Topics</a>
+      <a href="{% url 'note-trash' %}">Trash</a>
       <span>{{ user.username }}</span>
       <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="quiet">Sign out</button></form>
     </nav>

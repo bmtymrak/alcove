@@ -1,0 +1,24 @@
+{% extends "alcove/base.html" %}
+{% load note_content %}
+{% block title %}Trash · Alcove{% endblock %}
+{% block content %}
+<h1>Trash</h1>
+{% for note in note_page %}
+<article class="panel">
+  <div class="note-content">{{ note.content|render_note }}</div>
+  {% include "alcove/note_source.html" %}
+  {% include "alcove/note_topics.html" %}
+  <p class="metadata">Moved to trash {{ note.trashed_at|date:"M j, Y, H:i" }} UTC</p>
+  <div class="actions">
+    <form method="post" action="{% url 'restore-note' note.id %}">
+      {% csrf_token %}
+      <button type="submit">Restore note</button>
+    </form>
+    <a href="{% url 'delete-note-permanently' note.id %}">Delete permanently…</a>
+  </div>
+</article>
+{% empty %}
+<p>Trash is empty.</p>
+{% endfor %}
+{% if note_page.has_other_pages %}{% include "alcove/note_pages.html" %}{% endif %}
+{% endblock %}

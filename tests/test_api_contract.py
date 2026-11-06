@@ -97,6 +97,48 @@ def test_schema_is_available_to_the_signed_in_owner(signed_in):
     assert response.json() == SCHEMA
 
 
+def test_note_lifecycle_contract_matches_http(signed_in):
+    captured = json_request(
+        signed_in, "post", COLLECTION, {"content": document("A recoverable thought.")}
+    )
+    path = captured["Location"]
+    trash = COLLECTION + "trash/"
+    restore = "restore/"
+    purge = "delete-permanently/"
+    headers = {"HTTP_X_CSRFTOKEN": signed_in.cookies["csrftoken"].value}
+
+    wrong_state = signed_in.delete(path + purge, **headers)
+    validate_response(wrong_state, DETAIL + purge, "delete", 409)
+    assert wrong_state.json()["error"]["code"] == "invalid_note_state"
+    malformed = signed_in.delete(path, "{", content_type="application/json", **headers)
+    validate_response(malformed, DETAIL, "delete", 400)
+    assert malformed.json()["error"]["code"] == "parse_error"
+    validate_response(signed_in.get(path), DETAIL, "get", 200)
+    assert signed_in.delete(path, **headers).status_code == 204
+    validate_response(signed_in.get(path), DETAIL, "get", 404)
+    validate_response(signed_in.get(trash), trash, "get", 200)
+    unexpected = json_request(signed_in, "delete", path + purge, {"confirm": False})
+    validate_response(unexpected, DETAIL + purge, "delete", 400)
+    assert signed_in.get(trash).json()["count"] == 1
+    assert (
+        signed_in.post(
+            path + restore, content_type="application/json", **headers
+        ).status_code
+        == 204
+    )
+    assert signed_in.delete(path, **headers).status_code == 204
+    assert signed_in.delete(path + purge, **headers).status_code == 204
+
+    for route, method in (
+        (DETAIL, "delete"),
+        (DETAIL + restore, "post"),
+        (DETAIL + purge, "delete"),
+    ):
+        operation = SCHEMA["paths"][route][method]
+        assert "requestBody" not in operation
+        assert "content" not in operation["responses"]["204"]
+
+
 def test_book_and_source_contracts_match_real_requests_and_responses(signed_in):
     books = "/api/v1/books/"
     detail = "/api/v1/books/{book_id}/"

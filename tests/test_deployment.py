@@ -85,6 +85,12 @@ def assert_notes(page, origin, saved):
         expect(page.get_by_text(body, exact=True)).to_be_visible()
 
 
+def open_trash(page, origin, note_id, body):
+    assert page.request.get(f"{origin}/api/v1/notes/{note_id}/").status == 404
+    page.get_by_role("link", name="Trash", exact=True).click()
+    expect(page.get_by_text(body, exact=True)).to_be_visible()
+
+
 @pytest.fixture
 def production_browser():
     with sync_playwright() as playwright, playwright.chromium.launch() as browser:
@@ -177,7 +183,8 @@ def test_production_notes_survive_restart_and_isolated_recovery(
             data={"content": {"version": 1, "format": "plain-text", "text": body}},
         )
         assert response.status == 201
-        saved[response.json()["id"]] = body
+        trashed_id = response.json()["id"]
+        saved[trashed_id] = body
         with browser.new_context(
             ignore_https_errors=True, java_script_enabled=False
         ) as html_context:
@@ -190,13 +197,19 @@ def test_production_notes_survive_restart_and_isolated_recovery(
             saved[html_page.url.rstrip("/").split("/")[-1]] = body
 
         assert_notes(page, origin, saved)
+        trashed_body = saved.pop(trashed_id)
+        page.goto(f"{origin}/notes/{trashed_id}/")
+        page.get_by_role("button", name="Move to trash").click()
+        expect(page.get_by_text(trashed_body, exact=True)).to_be_visible()
         manage("backup_database", str(backup))
         assert manage("backup_database", str(backup), check=False).returncode == 1
         context.close()
 
     with serve(package, env, certificate, key, playwright) as origin:
         context = browser.new_context(ignore_https_errors=True)
-        assert_notes(sign_in(context, origin), origin, saved)
+        page = sign_in(context, origin)
+        assert_notes(page, origin, saved)
+        open_trash(page, origin, trashed_id, trashed_body)
         context.close()
 
     blocked_backup = tmp_path / "blocked.sqlite3"
@@ -230,5 +243,9 @@ def test_production_notes_survive_restart_and_isolated_recovery(
     )
     with serve(package, recovery_env, certificate, key, playwright) as origin:
         context = browser.new_context(ignore_https_errors=True)
-        assert_notes(sign_in(context, origin), origin, saved)
+        page = sign_in(context, origin)
+        assert_notes(page, origin, saved)
+        open_trash(page, origin, trashed_id, trashed_body)
+        page.get_by_role("button", name="Restore note").click()
+        assert_notes(page, origin, {trashed_id: trashed_body})
         context.close()

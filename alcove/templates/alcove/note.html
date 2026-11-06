@@ -10,7 +10,14 @@
   <div class="note-content">{{ note.content|render_note }}</div>
   <p class="metadata">Captured {{ note.captured_at|date:"M j, Y, H:i" }} UTC<br>Updated {{ note.updated_at|date:"M j, Y, H:i" }} UTC</p>
 </article>
-<div class="actions"><a class="button" href="{% url 'edit' note.id %}">Edit note</a><a href="{% url 'capture' %}">Capture a note</a></div>
+<div class="actions">
+  <a class="button" href="{% url 'edit' note.id %}">Edit note</a>
+  <a href="{% url 'capture' %}">Capture a note</a>
+  <form method="post" action="{% url 'trash-note' note.id %}">
+    {% csrf_token %}
+    <button type="submit" class="quiet">Move to trash</button>
+  </form>
+</div>
 <section aria-labelledby="related-notes">
   <h2 id="related-notes">Related Notes</h2>
   <a href="{% url 'note-link-picker' note.id %}">Link a related Note</a>

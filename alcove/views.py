@@ -72,6 +72,63 @@ def note_list(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@require_GET
+def note_trash(request: HttpRequest) -> HttpResponse:
+    return render(
+        request,
+        "alcove/note_trash.html",
+        {
+            "note_page": reading.trash(
+                collections.for_owner(request.user), request.GET.get("page", "1")
+            ),
+        },
+    )
+
+
+@login_required
+@require_POST
+def change_note_state(
+    request: HttpRequest, note_id: UUID, *, trashed: bool
+) -> HttpResponse:
+    try:
+        notes.set_trashed(collections.for_owner(request.user), note_id, trashed=trashed)
+    except notes.NoteError as exc:
+        return note_lifecycle_error(request, exc)
+    if trashed:
+        return redirect("note-trash")
+    return redirect("note", note_id=note_id)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def delete_note_permanently(request: HttpRequest, note_id: UUID) -> HttpResponse:
+    collection = collections.for_owner(request.user)
+    try:
+        if request.method == "POST":
+            notes.delete_permanently(
+                collection, note_id, confirmation=request.POST.get("confirmation", "")
+            )
+            return redirect("note-trash")
+        note = notes.require_trashed_note(collection, note_id)
+    except notes.NoteError as exc:
+        return note_lifecycle_error(request, exc)
+    return render(
+        request,
+        "alcove/note_permanent_deletion.html",
+        {"note": note, "confirmation": notes.deletion_confirmation(note)},
+    )
+
+
+def note_lifecycle_error(request: HttpRequest, exc: notes.NoteError) -> HttpResponse:
+    return render(
+        request,
+        "alcove/note_lifecycle_error.html",
+        {"message": str(exc)},
+        status=exc.status,
+    )
+
+
+@login_required
 @require_http_methods(["GET", "POST"])
 def capture(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse:
     collection = collections.for_owner(request.user)

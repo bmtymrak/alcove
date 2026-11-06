@@ -142,9 +142,12 @@ class NoteSerializer(serializers.Serializer):
     plain_text = serializers.CharField()
     captured_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
+    trashed_at = serializers.DateTimeField(
+        allow_null=True, help_text="Null when active, otherwise when moved to trash."
+    )
     revision = serializers.IntegerField(
         min_value=1,
-        help_text="Current saved revision; increases on each successful edit.",
+        help_text="Current saved revision; increases on edits and lifecycle changes.",
     )
 
 
@@ -295,6 +298,7 @@ class TopicImpactSerializer(serializers.Serializer):
 class TopicAssignmentImpactSerializer(serializers.Serializer):
     note = serializers.UUIDField()
     note_excerpt = serializers.CharField()
+    note_trashed = serializers.BooleanField()
     topic = TopicSerializer()
     ancestor = TopicSerializer(
         allow_null=True, help_text="Conflicting ancestor assignment, if any."

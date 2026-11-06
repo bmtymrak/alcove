@@ -117,8 +117,11 @@ Topics by full path. Selecting a Topic replaces any selected ancestors or
 descendants and keeps selections on other branches. Saved assignments appear
 alongside Notes. Open a Note and select **Link a related Note** to find another
 Note by text, Book, or Topic. Related Notes show their source and Topics, and
-you can follow or remove the link from either Note. Search across the Collection,
-trash, and portability remain later tickets from Spec #2.
+you can follow or remove the link from either Note. Select **Move to trash**
+on a Note to hide it from reading and the link picker. Open **Trash** to restore
+the Note with its surviving source, Topics, and Note Links, or confirm permanent
+deletion. Trash has no expiry. Collection-wide search and portability are
+planned separately.
 
 ## Editor assets
 

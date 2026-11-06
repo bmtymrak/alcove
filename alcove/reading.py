@@ -33,6 +33,10 @@ BOOK_NOTE_ORDERING = {
 TOPIC_MODES = ("branch", "direct")
 
 
+def active_notes(collection: Collection) -> QuerySet[Note]:
+    return Note.objects.filter(collection=collection, trashed_at__isnull=True)
+
+
 def _note_page(
     collection: Collection,
     queryset: QuerySet[Note],
@@ -52,13 +56,18 @@ def _note_page(
 
 @transaction.atomic
 def notes(collection: Collection, page: int | str = 1) -> Page[Note]:
-    return _note_page(collection, Note.objects.filter(collection=collection), page)
+    return _note_page(collection, active_notes(collection), page)
+
+
+@transaction.atomic
+def trash(collection: Collection, page: int | str = 1) -> Page[Note]:
+    results = Note.objects.filter(collection=collection, trashed_at__isnull=False)
+    return _note_page(collection, results.order_by("-trashed_at", "-id"), page)
 
 
 def note(collection: Collection, note_id: UUID) -> Note:
     return get_object_or_404(
-        Note.objects.select_related("book", "chapter"),
-        collection=collection,
+        active_notes(collection).select_related("book", "chapter"),
         pk=note_id,
     )
 
@@ -78,7 +87,7 @@ def related_notes(
     note(collection, note_id)
     return _note_page(
         collection,
-        Note.objects.filter(_linked_to(note_id), collection=collection),
+        active_notes(collection).filter(_linked_to(note_id)),
         page,
     )
 
@@ -88,9 +97,7 @@ def link_candidates(
     collection: Collection, note_id: UUID, query: str = "", page: int | str = 1
 ) -> Page[Note]:
     note(collection, note_id)
-    candidates = Note.objects.filter(collection=collection).exclude(
-        _linked_to(note_id) | Q(pk=note_id)
-    )
+    candidates = active_notes(collection).exclude(_linked_to(note_id) | Q(pk=note_id))
     query = query.strip()
     if query:
         matching_topics = [entry.id for entry in topics.tree(collection, query)]
@@ -154,9 +161,9 @@ def book_notes(
         raise Http404("Order not found.")
     return _note_page(
         collection,
-        Note.objects.filter(collection=collection, book_id=book_id).order_by(
-            *BOOK_NOTE_ORDERING[order]
-        ),
+        active_notes(collection)
+        .filter(book_id=book_id)
+        .order_by(*BOOK_NOTE_ORDERING[order]),
         page,
     )
 
@@ -188,7 +195,7 @@ def book_note_groups(
     }
     rank[None] = len(ordered)
 
-    book_results = Note.objects.filter(collection=collection, book_id=book_id)
+    book_results = active_notes(collection).filter(book_id=book_id)
     # Sort only placement IDs, then load content for the requested page.
     placements = list(
         book_results.annotate(
@@ -246,7 +253,7 @@ def topic_notes(
     assignments = TopicAssignment.objects.filter(
         note_id=OuterRef("pk"), topic_id__in=topic_ids
     )
-    results = Note.objects.filter(collection=collection).filter(Exists(assignments))
+    results = active_notes(collection).filter(Exists(assignments))
     return TopicNotes(selected, entries, _note_page(collection, results, page, entries))
 
 

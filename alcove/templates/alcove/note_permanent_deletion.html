@@ -1,0 +1,19 @@
+{% extends "alcove/base.html" %}
+{% load note_content %}
+{% block title %}Delete Note permanently · Alcove{% endblock %}
+{% block content %}
+<h1>Delete Note permanently</h1>
+<article class="panel">
+  <div class="note-content">{{ note.content|render_note }}</div>
+  {% include "alcove/note_source.html" %}
+</article>
+<p>This permanently removes the Note and its Note Links. This action cannot be undone.</p>
+<div class="actions">
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="confirmation" value="{{ confirmation }}">
+    <button type="submit">Delete permanently</button>
+  </form>
+  <a href="{% url 'note-trash' %}">Cancel</a>
+</div>
+{% endblock %}

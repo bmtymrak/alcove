@@ -151,6 +151,7 @@ class AssignmentImpact:
     assignment_id: int
     note: UUID
     note_excerpt: str
+    note_trashed: bool
     topic: TopicPath
     ancestor_assignment_id: int | None = None
     ancestor: TopicPath | None = None
@@ -205,16 +206,23 @@ def affected_assignments(
             note__collection=collection, topic_id__in=topic_ids
         )
         .order_by("note_id", "topic_id")
-        .values_list("id", "note_id", "topic_id", Substr("note__plain_text", 1, 121))
+        .values_list(
+            "id",
+            "note_id",
+            "topic_id",
+            "note__trashed_at",
+            Substr("note__plain_text", 1, 121),
+        )
     )
     return [
         AssignmentImpact(
             assignment_id,
             note_id,
             text[:120] + ("…" if len(text) > 120 else ""),
+            trashed_at is not None,
             entries[topic_id],
         )
-        for assignment_id, note_id, topic_id, text in rows
+        for assignment_id, note_id, topic_id, trashed_at, text in rows
     ]
 
 

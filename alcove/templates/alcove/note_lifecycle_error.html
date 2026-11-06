@@ -1,0 +1,6 @@
+{% extends "alcove/base.html" %}
+{% block title %}Note status · Alcove{% endblock %}
+{% block content %}
+<h1>{{ message }}</h1>
+<a href="{% url 'note-trash' %}">Open trash</a>
+{% endblock %}

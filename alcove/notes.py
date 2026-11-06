@@ -8,11 +8,13 @@ from uuid import UUID
 from django.db import transaction
 from django.db.models import Case, F, When
 from django.http import Http404
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.crypto import constant_time_compare, salted_hmac
 
 from . import note_content, reading, topics
 from .errors import NoteError as NoteError
-from .models import Chapter, Collection, Note, NoteLink
+from .models import Chapter, Collection, Note, NoteLink, RetiredCapture
 
 MAX_CONTENT_LENGTH = note_content.MAX_CONTENT_LENGTH
 # Leave room for the increment in SQLite's signed 64-bit integer storage.
@@ -29,6 +31,14 @@ class NoteConflict(NoteError):
             status=409,
         )
         self.current_revision = current_revision
+
+
+def _unavailable_capture_error() -> NoteError:
+    return NoteError(
+        "This capture belongs to a Note that was moved to trash or deleted.",
+        code="capture_conflict",
+        status=409,
+    )
 
 
 def plain_text_content(text: str) -> dict[str, Any]:
@@ -89,6 +99,59 @@ def validated_source_reference(value: Any) -> str:
 
 
 @transaction.atomic
+def set_trashed(collection: Collection, note_id: UUID, *, trashed: bool) -> None:
+    owned = Note.objects.filter(collection=collection, pk=note_id)
+    now = timezone.now()
+    # Moving to trash requires a null timestamp. Restoring requires a set one.
+    if owned.filter(trashed_at__isnull=trashed).update(
+        trashed_at=now if trashed else None, updated_at=now, revision=F("revision") + 1
+    ):
+        return
+    if not owned.exists():
+        raise Http404("Note not found.")
+    message = "This Note is already in trash." if trashed else "This Note is active."
+    raise NoteError(message, code="invalid_note_state", status=409)
+
+
+def require_trashed_note(collection: Collection, note_id: UUID) -> Note:
+    note = get_object_or_404(Note, collection=collection, pk=note_id)
+    if note.trashed_at is None:
+        raise NoteError(
+            "Move this Note to trash before deleting it permanently.",
+            code="invalid_note_state",
+            status=409,
+        )
+    return note
+
+
+def deletion_confirmation(note: Note) -> str:
+    return salted_hmac(
+        "alcove.note-deletion", f"{note.id}:{note.revision}", algorithm="sha256"
+    ).hexdigest()
+
+
+@transaction.atomic
+def delete_permanently(
+    collection: Collection, note_id: UUID, *, confirmation: str | None = None
+) -> None:
+    # Serialize the state check, cascades, and capture retirement with writes.
+    Collection.objects.filter(pk=collection.pk).update(id=F("id"))
+    note = require_trashed_note(collection, note_id)
+    if confirmation is not None and not constant_time_compare(
+        confirmation, deletion_confirmation(note)
+    ):
+        raise NoteError(
+            "This Note changed after you opened it.",
+            code="stale_preview",
+            status=409,
+        )
+    if note.capture_id is not None:
+        # A delayed capture retry must not recreate the deleted Note.
+        RetiredCapture.objects.create(collection=collection, capture_id=note.capture_id)
+    note.delete()
+
+
+@transaction.atomic
 def change_link(
     collection: Collection,
     note_id: UUID,
@@ -99,9 +162,9 @@ def change_link(
     # Take the SQLite write lock before validating endpoints and mutating the pair.
     Collection.objects.filter(pk=collection.pk).update(id=F("id"))
     owned_ids = set(
-        Note.objects.filter(
-            collection=collection, pk__in=(note_id, related_note)
-        ).values_list("pk", flat=True)
+        reading.active_notes(collection)
+        .filter(pk__in=(note_id, related_note))
+        .values_list("pk", flat=True)
     )
     if note_id not in owned_ids:
         raise Http404("Note not found.")
@@ -189,8 +252,14 @@ def capture(
                     code="capture_conflict",
                     status=409,
                 )
+            if prior.trashed_at is not None:
+                raise _unavailable_capture_error()
             reading.load_topics(collection, [prior])
             return prior, False
+        if RetiredCapture.objects.filter(
+            collection=collection, capture_id=capture_id
+        ).exists():
+            raise _unavailable_capture_error()
 
     book_id = validated_book(collection, book)
     note = Note.objects.create(
@@ -254,11 +323,14 @@ def edit(
     # Validate references before the transaction so the first transactional
     # database operation takes SQLite's write lock, including for source edits.
     with transaction.atomic():
-        changed = Note.objects.filter(
-            collection=collection,
-            pk=note_id,
-            revision=revision,
-        ).update(**changes)
+        changed = (
+            reading.active_notes(collection)
+            .filter(
+                pk=note_id,
+                revision=revision,
+            )
+            .update(**changes)
+        )
         note = reading.note(collection, note_id)
         if not changed:
             raise NoteConflict(note.revision)

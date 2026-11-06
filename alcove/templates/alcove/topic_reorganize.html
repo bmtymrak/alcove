@@ -34,7 +34,12 @@
   <h3>{% if moving %}Conflicting Topic Assignments{% else %}Topic Assignments to clear{% endif %}</h3>
   <ul>
     {% for row in preview.assignments %}
-    <li><a href="{% url 'note' row.note %}">{{ row.note_excerpt }}</a>
+    <li>
+      {% if row.note_trashed %}
+      {{ row.note_excerpt }} <span class="metadata">(in trash)</span>
+      {% else %}
+      <a href="{% url 'note' row.note %}">{{ row.note_excerpt }}</a>
+      {% endif %}
       <ul>
         {% if row.ancestor %}<li>Ancestor assignment: {{ row.ancestor.full_path }}</li>{% endif %}
         <li>{% if row.ancestor %}Descendant assignment: {% endif %}{{ row.topic.full_path }}</li>
