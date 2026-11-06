@@ -8,6 +8,8 @@ __pycache__/
 .ruff_cache/
 data/
 .env
+.env.*
+!.env.example
 staticfiles/
 test-results/
 playwright-report/

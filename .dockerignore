@@ -1,0 +1,12 @@
+**
+!manage.py
+!pyproject.toml
+!uv.lock
+!alcove/
+!alcove/**
+!config/
+!config/**
+!deploy/
+!deploy/entrypoint.sh
+**/__pycache__/
+**/*.py[cod]

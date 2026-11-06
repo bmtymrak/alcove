@@ -12,7 +12,13 @@ if not SECRET_KEY:
     if not DEBUG:
         raise ImproperlyConfigured("Set ALCOVE_SECRET_KEY when ALCOVE_DEBUG=0.")
     SECRET_KEY = "development-only-alcove-secret-key-do-not-use-in-production"
-ALLOWED_HOSTS = os.environ.get("ALCOVE_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get("ALCOVE_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if host.strip()
+]
+if os.environ.get("ALCOVE_TRUST_PROXY_HTTPS") == "1":
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -24,6 +30,7 @@ INSTALLED_APPS = [
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -45,7 +52,8 @@ TEMPLATES = [
 ]
 WSGI_APPLICATION = "config.wsgi.application"
 DATA_DIR = BASE_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
+if "ALCOVE_DATABASE" not in os.environ:
+    DATA_DIR.mkdir(exist_ok=True)
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",

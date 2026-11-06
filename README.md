@@ -31,12 +31,12 @@ the server with the same database path to retain the Collection. To use another
 persistent file, set `ALCOVE_DATABASE` to its absolute path; create its parent
 directory first. Runtime dependencies and development tools are pinned in `uv.lock`.
 
-Local development defaults to debug mode and a development-only secret. For a
-deployment set `ALCOVE_DEBUG=0`, a private random `ALCOVE_SECRET_KEY`, and
-`ALCOVE_ALLOWED_HOSTS` (comma-separated hostnames). This enables secure session and
-CSRF cookies, so HTTPS is required. Keep the secret stable across restarts. A
-production server, TLS routing, backups, and deployment packaging are later work;
-`runserver` is only for local development.
+## Deploy on a server
+
+The [deployment runbook](docs/deployment.md) covers Compose setup, private HTTPS
+access, owner provisioning, persistent SQLite, backups, isolated recovery, and
+upgrades. The package runs Gunicorn with debug disabled and collects the
+checked-in editor assets during the image build.
 
 ## Check the application
 
@@ -62,7 +62,8 @@ capture, repeated Book marginalia capture, inline reading, ordering, reload,
 autosave, formatted round trips, website links, draft recovery, delayed and lost
 responses, two-tab conflicts and resolution, and sign-out.
 For a focused run use `uv run pytest tests/test_notes_http.py` or
-`uv run pytest tests/test_browser.py`. If browser downloads are stored in a custom
+`uv run pytest tests/test_browser.py`. The production restart and recovery test also needs OpenSSL.
+If browser downloads are stored in a custom
 location, set `PLAYWRIGHT_BROWSERS_PATH` for both installation and test runs.
 
 ## Application boundaries

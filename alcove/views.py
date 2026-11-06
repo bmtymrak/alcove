@@ -5,10 +5,16 @@ from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LogoutView
+from django.db import DatabaseError
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.crypto import salted_hmac
-from django.views.decorators.http import require_GET, require_http_methods, require_POST
+from django.views.decorators.http import (
+    require_GET,
+    require_http_methods,
+    require_POST,
+    require_safe,
+)
 
 from . import books, collections, notes, reading, topics
 from .forms import (
@@ -23,6 +29,15 @@ from .forms import (
     TopicReorganizationForm,
 )
 from .models import Collection
+
+
+@require_safe
+def health(request: HttpRequest) -> HttpResponse:
+    try:
+        Collection.objects.exists()
+    except DatabaseError:
+        return HttpResponse("unavailable\n", status=503, content_type="text/plain")
+    return HttpResponse("ok\n", content_type="text/plain")
 
 
 class SignOutView(LogoutView):

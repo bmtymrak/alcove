@@ -9,6 +9,10 @@ session. Unsafe API requests require the session cookie and `X-CSRFToken` matchi
 the CSRF cookie. Send `Content-Type: application/json` with JSON bodies. Same-origin Django CSRF checks
 also validate Origin/Referer. Non-browser and cross-origin authentication are deferred.
 
+The deployment probe at `GET /healthz` is separate from the versioned API.
+See the [deployment runbook](deployment.md#start-from-a-clean-checkout) for its
+response and access contract.
+
 The machine-readable contract is [openapi.yaml](openapi.yaml), generated with
 drf-spectacular and served to authenticated users at `/api/v1/schema/`. The suite
 checks schema drift and validates real request/response examples against it.

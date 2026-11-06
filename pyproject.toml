@@ -7,6 +7,8 @@ dependencies = [
   "django>=5.2,<5.3",
   "djangorestframework>=3.16,<3.17",
   "drf-spectacular>=0.28,<0.30",
+  "gunicorn>=23,<27",
+  "whitenoise>=6.12,<7",
 ]
 
 [dependency-groups]

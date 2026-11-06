@@ -1,0 +1,29 @@
+services:
+  app:
+    image: "alcove:${ALCOVE_IMAGE_TAG:-local}"
+    build: .
+    user: "${ALCOVE_UID:-10001}:${ALCOVE_GID:-10001}"
+    environment:
+      ALCOVE_SECRET_KEY: "${ALCOVE_SECRET_KEY:?Set ALCOVE_SECRET_KEY}"
+      ALCOVE_ALLOWED_HOSTS: "${ALCOVE_ALLOWED_HOSTS:?Set ALCOVE_ALLOWED_HOSTS},127.0.0.1"
+      ALCOVE_TRUST_PROXY_HTTPS: "${ALCOVE_TRUST_PROXY_HTTPS:-0}"
+    ports:
+      - "127.0.0.1:${ALCOVE_PORT:-8000}:8000"
+    volumes:
+      - type: bind
+        source: "${ALCOVE_DATA_DIR:?Set ALCOVE_DATA_DIR}"
+        target: /var/lib/alcove
+        bind:
+          create_host_path: false
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/healthz', timeout=3).close()"
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped
+    stop_grace_period: 35s

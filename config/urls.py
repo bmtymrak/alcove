@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from alcove import api, views
 
 urlpatterns = [
+    path("healthz", views.health, name="health"),
     path("login/", LoginView.as_view(), name="login"),
     path("logout/", views.SignOutView.as_view(), name="logout"),
     path("", views.index, name="index"),
