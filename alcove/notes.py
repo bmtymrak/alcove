@@ -2,7 +2,7 @@ import json
 from collections.abc import Sequence
 from enum import Enum
 from hashlib import sha256
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from django.db import transaction
@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from . import note_content, reading, topics
 from .errors import NoteError as NoteError
-from .models import Chapter, Collection, Note
+from .models import Chapter, Collection, Note, NoteLink
 
 MAX_CONTENT_LENGTH = note_content.MAX_CONTENT_LENGTH
 # Leave room for the increment in SQLite's signed 64-bit integer storage.
@@ -86,6 +86,54 @@ def validated_source_reference(value: Any) -> str:
         message = "Enter a valid text Source Reference."
         raise NoteError(message, fields={"source_reference": [message]})
     return value.replace("\r\n", "\n").replace("\r", "\n")
+
+
+@transaction.atomic
+def change_link(
+    collection: Collection,
+    note_id: UUID,
+    related_note: UUID,
+    *,
+    action: Literal["add", "remove"],
+) -> None:
+    # Take the SQLite write lock before validating endpoints and mutating the pair.
+    Collection.objects.filter(pk=collection.pk).update(id=F("id"))
+    owned_ids = set(
+        Note.objects.filter(
+            collection=collection, pk__in=(note_id, related_note)
+        ).values_list("pk", flat=True)
+    )
+    if note_id not in owned_ids:
+        raise Http404("Note not found.")
+
+    first, second = sorted((note_id, related_note))
+    if action == "remove":
+        if (
+            related_note not in owned_ids
+            or not NoteLink.objects.filter(
+                first_note_id=first, second_note_id=second
+            ).delete()[0]
+        ):
+            raise Http404("Note Link not found.")
+        return
+
+    if note_id == related_note:
+        message = "Choose a different Note."
+        raise NoteError(message, code="self_link", fields={"related_note": [message]})
+    if related_note not in owned_ids:
+        message = "Choose a Note from your Collection."
+        raise NoteError(message, fields={"related_note": [message]})
+    _, created = NoteLink.objects.get_or_create(
+        first_note_id=first, second_note_id=second
+    )
+    if not created:
+        message = "These Notes are already linked."
+        raise NoteError(
+            message,
+            code="duplicate_link",
+            status=409,
+            fields={"related_note": [message]},
+        )
 
 
 @transaction.atomic

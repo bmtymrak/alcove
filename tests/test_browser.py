@@ -881,3 +881,39 @@ def test_autosave_refreshes_assignments_after_a_topic_move(page, live_server):
     expect(
         selected.get_by_role("button", name="Remove History", exact=True)
     ).to_be_visible()
+
+
+def test_find_follow_and_remove_a_related_note_in_browser(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(live_server.url + "/login/")
+    page.get_by_label("Username").fill("reader")
+    page.get_by_label("Password").fill(PASSWORD)
+    page.get_by_role("button", name="Sign in", exact=True).click()
+
+    for text in ("The earlier observation.", "A distinctive later thought."):
+        page.get_by_role("link", name="Capture a note", exact=True).click()
+        page.get_by_label("Your note").fill(text)
+        page.get_by_role("button", name="Save note", exact=True).click()
+        expect(page.get_by_role("heading", name="Your note")).to_be_visible()
+        if text == "The earlier observation.":
+            first_url = page.url
+    second_url = page.url
+
+    page.goto(first_url)
+    page.get_by_role("link", name="Link a related Note", exact=True).click()
+    page.get_by_role("searchbox", name="Find a Note").fill("distinctive")
+    page.get_by_role("button", name="Find", exact=True).click()
+    page.get_by_role("button", name="Link Note", exact=True).click()
+
+    expect(page).to_have_url(first_url)
+    page.get_by_role("link", name="A distinctive later thought.", exact=True).click()
+    expect(page).to_have_url(second_url)
+    reverse_link = page.get_by_role("link", name="The earlier observation.", exact=True)
+    expect(reverse_link).to_have_attribute(
+        "href", first_url.removeprefix(live_server.url)
+    )
+
+    page.get_by_role("button", name="Remove link", exact=True).click()
+    expect(reverse_link).to_have_count(0)
+    page.goto(first_url)
+    expect(page.get_by_text("No related Notes yet.")).to_be_visible()

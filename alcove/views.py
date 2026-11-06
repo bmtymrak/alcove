@@ -8,13 +8,14 @@ from django.contrib.auth.views import LogoutView
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.crypto import salted_hmac
-from django.views.decorators.http import require_GET, require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from . import books, collections, notes, reading, topics
 from .forms import (
     BookForm,
     CaptureForm,
     EditForm,
+    NoteLinkForm,
     TopicCreateForm,
     TopicMoveForm,
     TopicRemovalForm,
@@ -104,8 +105,53 @@ def capture(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse:
 @login_required
 @require_GET
 def detail(request: HttpRequest, note_id: UUID) -> HttpResponse:
-    note = reading.note_with_topics(collections.for_owner(request.user), note_id)
-    return render(request, "alcove/note.html", {"note": note})
+    collection = collections.for_owner(request.user)
+    note = reading.note_with_topics(collection, note_id)
+    related = reading.related_notes(collection, note_id, request.GET.get("page", "1"))
+    return render(request, "alcove/note.html", {"note": note, "note_page": related})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def note_link_picker(request: HttpRequest, note_id: UUID) -> HttpResponse:
+    collection = collections.for_owner(request.user)
+    form = NoteLinkForm(request.POST if request.method == "POST" else None)
+    status = 400 if form.is_bound else 200
+    if form.is_valid():
+        try:
+            notes.change_link(
+                collection, note_id, form.cleaned_data["related_note"], action="add"
+            )
+        except notes.NoteError as exc:
+            form.add_error("related_note", str(exc))
+            status = exc.status
+        else:
+            return redirect("note", note_id=note_id)
+
+    query = request.GET.get("q", "")
+    page = reading.link_candidates(
+        collection,
+        note_id,
+        query,
+        "1" if form.is_bound else request.GET.get("page", "1"),
+    )
+    return render(
+        request,
+        "alcove/note_link_picker.html",
+        {"note_id": note_id, "form": form, "query": query, "note_page": page},
+        status=status,
+    )
+
+
+@login_required
+@require_POST
+def remove_note_link(
+    request: HttpRequest, note_id: UUID, related_note_id: UUID
+) -> HttpResponse:
+    notes.change_link(
+        collections.for_owner(request.user), note_id, related_note_id, action="remove"
+    )
+    return redirect("note", note_id=note_id)
 
 
 @login_required

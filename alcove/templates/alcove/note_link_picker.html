@@ -1,0 +1,25 @@
+{% extends "alcove/base.html" %}
+{% block title %}Link a related Note · Alcove{% endblock %}
+{% block content %}
+<a href="{% url 'note' note_id %}">← Back to Note</a>
+<h1>Link a related Note</h1>
+<form method="get" role="search">
+  <label for="note-query">Find a Note</label>
+  <input id="note-query" type="search" name="q" value="{{ query }}" placeholder="Note text, Book, or Topic">
+  <button type="submit">Find</button>
+</form>
+{{ form.related_note.errors }}
+{% for candidate in note_page %}
+<article class="panel">
+  {% include "alcove/note_link_preview.html" with note=candidate only %}
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="related_note" value="{{ candidate.id }}">
+    <button type="submit">Link Note</button>
+  </form>
+</article>
+{% empty %}
+<p>No matching Notes available to link.</p>
+{% endfor %}
+{% if note_page.has_other_pages %}{% include "alcove/note_pages.html" %}{% endif %}
+{% endblock %}

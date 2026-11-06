@@ -19,7 +19,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 
 from . import topics
-from .models import Book, Chapter, Collection, Note, Topic, TopicAssignment
+from .models import Book, Chapter, Collection, Note, NoteLink, Topic, TopicAssignment
 
 PAGE_SIZE = 20
 CAPTURE_ORDER = ("captured_at", "id")
@@ -61,6 +61,51 @@ def note(collection: Collection, note_id: UUID) -> Note:
         collection=collection,
         pk=note_id,
     )
+
+
+def _linked_to(note_id: UUID) -> Q:
+    return Q(
+        pk__in=NoteLink.objects.filter(first_note_id=note_id).values("second_note_id")
+    ) | Q(
+        pk__in=NoteLink.objects.filter(second_note_id=note_id).values("first_note_id")
+    )
+
+
+@transaction.atomic
+def related_notes(
+    collection: Collection, note_id: UUID, page: int | str = 1
+) -> Page[Note]:
+    note(collection, note_id)
+    return _note_page(
+        collection,
+        Note.objects.filter(_linked_to(note_id), collection=collection),
+        page,
+    )
+
+
+@transaction.atomic
+def link_candidates(
+    collection: Collection, note_id: UUID, query: str = "", page: int | str = 1
+) -> Page[Note]:
+    note(collection, note_id)
+    candidates = Note.objects.filter(collection=collection).exclude(
+        _linked_to(note_id) | Q(pk=note_id)
+    )
+    query = query.strip()
+    if query:
+        matching_topics = [entry.id for entry in topics.tree(collection, query)]
+        assignments = TopicAssignment.objects.filter(
+            note_id=OuterRef("pk"), topic_id__in=matching_topics
+        )
+        candidates = candidates.filter(
+            Q(plain_text__icontains=query)
+            | Q(book__title__icontains=query)
+            | Q(book__author__icontains=query)
+            | Q(chapter__label__icontains=query)
+            | Q(source_reference__icontains=query)
+            | Q(Exists(assignments))
+        )
+    return _note_page(collection, candidates, page)
 
 
 def library(collection: Collection, page: int | str = 1) -> Page[Book]:

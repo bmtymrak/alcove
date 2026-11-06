@@ -96,7 +96,7 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_PATCH": False,
     "DESCRIPTION": (
         "Private same-origin session API. Sign in at /login/ with CSRF. "
-        "Send the csrftoken cookie in X-CSRFToken on POST/PATCH. "
+        "Send the csrftoken cookie in X-CSRFToken on POST/PATCH/DELETE. "
         "Notes use stable UUIDs and UTC timestamps. See docs/api.md."
     ),
 }

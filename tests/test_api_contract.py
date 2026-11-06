@@ -352,3 +352,44 @@ def test_topic_browsing_and_book_group_contracts_match_real_responses(signed_in)
     group_path = groups.format(book_id=book["id"])
     validate_response(signed_in.get(group_path), groups, "get", 200)
     validate_response(signed_in.get(group_path + "?page=0"), groups, "get", 404)
+
+
+def test_note_link_contract_matches_real_requests_and_responses(signed_in):
+    first, second = [
+        json_request(signed_in, "post", COLLECTION, {"content": document(text)}).json()[
+            "id"
+        ]
+        for text in ("Original Note.", "Related Note.")
+    ]
+    candidates = DETAIL + "link-candidates/"
+    links = DETAIL + "links/"
+    pair = links + "{related_note_id}/"
+    link_url = links.format(note_id=first)
+    validate_response(
+        signed_in.get(candidates.format(note_id=first), {"q": "related"}),
+        candidates,
+        "get",
+        200,
+    )
+    payload = {"related_note": second}
+    validate_request(payload, links, "post")
+    validate_response(
+        json_request(signed_in, "post", link_url, payload), links, "post", 201
+    )
+    validate_response(signed_in.get(links.format(note_id=second)), links, "get", 200)
+    validate_response(
+        json_request(signed_in, "post", link_url, payload), links, "post", 409
+    )
+    validate_response(
+        json_request(signed_in, "post", link_url, {"related_note": first}),
+        links,
+        "post",
+        400,
+    )
+    url = pair.format(note_id=second, related_note_id=first)
+    removed = signed_in.delete(
+        url, HTTP_X_CSRFTOKEN=signed_in.cookies["csrftoken"].value
+    )
+    assert removed.status_code == 204 and removed.content == b""
+    assert "content" not in SCHEMA["paths"][pair]["delete"]["responses"]["204"]
+    validate_response(json_request(signed_in, "delete", url, {}), pair, "delete", 404)

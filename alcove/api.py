@@ -24,8 +24,11 @@ from .serializers import (
     ConflictSerializer,
     EditSerializer,
     ErrorSerializer,
+    NoteLinkSerializer,
     NotePageSerializer,
     NoteSerializer,
+    RelatedNotePageSerializer,
+    RelatedNoteSerializer,
     TopicCreateSerializer,
     TopicMoveDestinationSerializer,
     TopicMoveSerializer,
@@ -141,6 +144,97 @@ class NoteView(APIView):
         payload.is_valid(raise_exception=True)
         note = notes.edit(collection, note_id, **payload.validated_data)
         return Response(NoteSerializer(note).data)
+
+
+class NoteLinkCandidatesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="note_link_candidates",
+        parameters=[
+            OpenApiParameter(
+                "q", str, description="Literal substring of Note text or context."
+            ),
+            OpenApiParameter("page", int, description="1-based page; 20 Notes."),
+        ],
+        responses={200: RelatedNotePageSerializer, **ERRORS},
+    )
+    def get(self, request: Request, note_id: UUID) -> Response:
+        page = reading.link_candidates(
+            collections.for_owner(request.user),
+            note_id,
+            request.query_params.get("q", ""),
+            request.query_params.get("page", "1"),
+        )
+        return page_response(page, RelatedNoteSerializer)
+
+
+class NoteLinksView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="note_links_list",
+        parameters=[
+            OpenApiParameter("page", int, description="1-based page; 20 Notes.")
+        ],
+        responses={200: RelatedNotePageSerializer, **ERRORS},
+    )
+    def get(self, request: Request, note_id: UUID) -> Response:
+        page = reading.related_notes(
+            collections.for_owner(request.user),
+            note_id,
+            request.query_params.get("page", "1"),
+        )
+        return page_response(page, RelatedNoteSerializer)
+
+    @extend_schema(
+        operation_id="note_links_create",
+        request=NoteLinkSerializer,
+        responses={
+            201: NoteLinkSerializer,
+            **WRITE_ERRORS,
+            400: OpenApiResponse(
+                ErrorSerializer,
+                description="Invalid fields, invalid target, or self-link.",
+            ),
+            409: OpenApiResponse(
+                ErrorSerializer, description="These Notes are already linked."
+            ),
+        },
+    )
+    def post(self, request: Request, note_id: UUID) -> Response:
+        collection = collections.for_owner(request.user)
+        payload = NoteLinkSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        notes.change_link(
+            collection, note_id, payload.validated_data["related_note"], action="add"
+        )
+        return Response(payload.data, status=201)
+
+
+class NoteLinkView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="note_links_remove",
+        responses={
+            204: None,
+            **ERRORS,
+            404: OpenApiResponse(
+                ErrorSerializer, description="Note or Note Link not found."
+            ),
+        },
+    )
+    def delete(
+        self, request: Request, note_id: UUID, related_note_id: UUID
+    ) -> Response:
+        notes.change_link(
+            collections.for_owner(request.user),
+            note_id,
+            related_note_id,
+            action="remove",
+        )
+        return Response(status=204)
 
 
 class BooksView(APIView):

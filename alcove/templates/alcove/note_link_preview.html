@@ -1,0 +1,3 @@
+<p><a href="{% url 'note' note.id %}">{{ note.plain_text|truncatechars:180 }}</a></p>
+{% include "alcove/note_source.html" %}
+{% include "alcove/note_topics.html" %}

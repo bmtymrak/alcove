@@ -63,6 +63,22 @@ class Note(models.Model):
         ]
 
 
+class NoteLink(models.Model):
+    first_note = models.ForeignKey(Note, on_delete=models.CASCADE, related_name="+")
+    second_note = models.ForeignKey(Note, on_delete=models.CASCADE, related_name="+")
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(first_note__lt=models.F("second_note")),
+                name="ordered_note_link_endpoints",
+            ),
+            models.UniqueConstraint(
+                fields=["first_note", "second_note"], name="unique_note_link_pair"
+            ),
+        ]
+
+
 TOPIC_LABEL_LENGTH = 300
 
 

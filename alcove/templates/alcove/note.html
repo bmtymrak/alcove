@@ -11,4 +11,20 @@
   <p class="metadata">Captured {{ note.captured_at|date:"M j, Y, H:i" }} UTC<br>Updated {{ note.updated_at|date:"M j, Y, H:i" }} UTC</p>
 </article>
 <div class="actions"><a class="button" href="{% url 'edit' note.id %}">Edit note</a><a href="{% url 'capture' %}">Capture a note</a></div>
+<section aria-labelledby="related-notes">
+  <h2 id="related-notes">Related Notes</h2>
+  <a href="{% url 'note-link-picker' note.id %}">Link a related Note</a>
+  {% for related in note_page %}
+  <article class="panel">
+    {% include "alcove/note_link_preview.html" with note=related only %}
+    <form method="post" action="{% url 'remove-note-link' note.id related.id %}">
+      {% csrf_token %}
+      <button type="submit" class="quiet">Remove link</button>
+    </form>
+  </article>
+  {% empty %}
+  <p>No related Notes yet.</p>
+  {% endfor %}
+  {% if note_page.has_other_pages %}{% include "alcove/note_pages.html" %}{% endif %}
+</section>
 {% endblock %}

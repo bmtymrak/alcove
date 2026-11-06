@@ -5,8 +5,8 @@ Chapter, Note, Topic, and Reading interfaces. All endpoints below, including `/a
 sign-in. Get `/login/`, then POST the username, password, and CSRF token from that
 page. There is no registration endpoint. Django rotates the CSRF token at login;
 use the new `csrftoken` cookie afterward. POST `/logout/` with CSRF to revoke the
-session. Unsafe API requests require `Content-Type: application/json`, the session
-cookie, and `X-CSRFToken` matching the CSRF cookie. Same-origin Django CSRF checks
+session. Unsafe API requests require the session cookie and `X-CSRFToken` matching
+the CSRF cookie. Send `Content-Type: application/json` with JSON bodies. Same-origin Django CSRF checks
 also validate Origin/Referer. Non-browser and cross-origin authentication are deferred.
 
 The machine-readable contract is [openapi.yaml](openapi.yaml), generated with
@@ -37,6 +37,10 @@ checks schema drift and validates real request/response examples against it.
 | Capture a Note | `POST /api/v1/notes/` | `201` on creation or `200` on replay, both with a relative `Location` header |
 | Read a Note | `GET /api/v1/notes/{uuid}/` | `200` |
 | Edit a Note (including autosave) | `PATCH /api/v1/notes/{uuid}/` | `200` |
+| Find a Note to link | `GET /api/v1/notes/{note_id}/link-candidates/?q=essay&page=1` | `200` |
+| List a Note's related Notes | `GET /api/v1/notes/{note_id}/links/?page=1` | `200` |
+| Link two Notes | `POST /api/v1/notes/{note_id}/links/` | `201` |
+| Remove a Note Link | `DELETE /api/v1/notes/{note_id}/links/{related_note_id}/` | `204` |
 
 A Book needs only `{"title": "Ways of Seeing"}`. An optional `author` defaults to
 an empty string. Metadata is trimmed and limited to 300 characters per field;
@@ -117,6 +121,34 @@ Edit revisions must be JSON integers between 1 and 9223372036854775806 (strings,
 booleans, floating-point values, and omitted revisions are rejected), leaving room
 for the increment in SQLite storage. Out-of-range preconditions are field errors
 (`400`) and do not change the Note.
+
+## Note Links
+
+Send `{"related_note": "<note-uuid>"}` to link the two Notes. The response
+echoes the related Note UUID. The same unordered pair appears under either
+Note, and either endpoint can be used to remove it. Link changes leave
+both Notes' revisions, timestamps, and content intact.
+
+The candidate picker matches a trimmed literal substring against readable
+Note text, Book title or author, Chapter label, Source Reference, or assigned
+Topic path. An empty query browses all eligible Notes. The picker excludes the
+current Note and Notes already linked to it. Candidate and related Note lists
+use the standard 20-item pagination envelope, in capture order with UUID as
+the final tiebreaker. Each result has the regular Note fields, including Topic
+paths, plus `book_title` (string or null). Use its `id` to open the same Note
+at `GET /api/v1/notes/{note_id}/`.
+
+| Condition | Response |
+| --- | --- |
+| Create with the same Note at both endpoints | `400`, `self_link` with a `related_note` field error |
+| Create with an unknown or foreign related Note | `400`, `invalid` with the same `related_note` field error for both cases |
+| Create a pair that already exists in either order | `409`, `duplicate_link` with a `related_note` field error |
+| Address an unknown or foreign source Note | `404` |
+| Remove an absent link, including a repeated removal or a foreign endpoint | `404` |
+
+Rejected operations leave existing links intact. After an uncertain create
+response, read the list or retry the same pair and check for `duplicate_link`.
+Removal needs no request body.
 
 ## Topics and Topic Assignments
 

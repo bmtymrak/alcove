@@ -81,8 +81,33 @@ urlpatterns = [
     path("notes/new/", views.capture, name="capture"),
     path("notes/<uuid:note_id>/", views.detail, name="note"),
     path("notes/<uuid:note_id>/edit/", views.edit, name="edit"),
+    path(
+        "notes/<uuid:note_id>/link/",
+        views.note_link_picker,
+        name="note-link-picker",
+    ),
+    path(
+        "notes/<uuid:note_id>/links/<uuid:related_note_id>/remove/",
+        views.remove_note_link,
+        name="remove-note-link",
+    ),
     path("api/v1/notes/", api.NotesView.as_view(), name="api-notes"),
     path("api/v1/notes/<uuid:note_id>/", api.NoteView.as_view(), name="api-note"),
+    path(
+        "api/v1/notes/<uuid:note_id>/link-candidates/",
+        api.NoteLinkCandidatesView.as_view(),
+        name="api-note-link-candidates",
+    ),
+    path(
+        "api/v1/notes/<uuid:note_id>/links/",
+        api.NoteLinksView.as_view(),
+        name="api-note-links",
+    ),
+    path(
+        "api/v1/notes/<uuid:note_id>/links/<uuid:related_note_id>/",
+        api.NoteLinkView.as_view(),
+        name="api-note-link",
+    ),
     path(
         "api/v1/schema/",
         SpectacularAPIView.as_view(

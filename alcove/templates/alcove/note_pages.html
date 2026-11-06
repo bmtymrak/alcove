@@ -1,5 +1,5 @@
 <nav aria-label="Note pages">
-{% if note_page.has_previous %}<a href="?{% if order %}order={{ order }}&amp;{% endif %}{% if mode %}mode={{ mode }}&amp;{% endif %}page={{ note_page.previous_page_number }}">Previous</a>{% endif %}
+{% if note_page.has_previous %}<a href="?{% if query %}q={{ query|urlencode }}&amp;{% endif %}{% if order %}order={{ order }}&amp;{% endif %}{% if mode %}mode={{ mode }}&amp;{% endif %}page={{ note_page.previous_page_number }}">Previous</a>{% endif %}
 <span>Page {{ note_page.number }} of {{ note_page.paginator.num_pages }}</span>
-{% if note_page.has_next %}<a href="?{% if order %}order={{ order }}&amp;{% endif %}{% if mode %}mode={{ mode }}&amp;{% endif %}page={{ note_page.next_page_number }}">Next</a>{% endif %}
+{% if note_page.has_next %}<a href="?{% if query %}q={{ query|urlencode }}&amp;{% endif %}{% if order %}order={{ order }}&amp;{% endif %}{% if mode %}mode={{ mode }}&amp;{% endif %}page={{ note_page.next_page_number }}">Next</a>{% endif %}
 </nav>

@@ -186,6 +186,10 @@ class EditForm(NoteForm):
     )
 
 
+class NoteLinkForm(forms.Form):
+    related_note = forms.UUIDField()
+
+
 class BookForm(forms.Form):
     title = forms.CharField(max_length=300)
     author = forms.CharField(max_length=300, required=False)

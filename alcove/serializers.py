@@ -155,6 +155,18 @@ class NotePageSerializer(serializers.Serializer):
     results = NoteSerializer(many=True)
 
 
+class NoteLinkSerializer(StrictSerializer):
+    related_note = StrictUUIDField()
+
+
+class RelatedNoteSerializer(NoteSerializer):
+    book_title = serializers.CharField(source="book.title", allow_null=True)
+
+
+class RelatedNotePageSerializer(NotePageSerializer):
+    results = RelatedNoteSerializer(many=True)
+
+
 class BookNoteGroupSerializer(serializers.Serializer):
     topic = TopicSerializer(allow_null=True)
     notes = NoteSerializer(many=True)

@@ -114,7 +114,9 @@ capture UUID. Acknowledged captures clear the draft. Open **Topics** from the na
 create or rename roots and children. Capture and edit forms suggest existing
 Topics by full path. Selecting a Topic replaces any selected ancestors or
 descendants and keeps selections on other branches. Saved assignments appear
-alongside Notes. Search, Note Links,
+alongside Notes. Open a Note and select **Link a related Note** to find another
+Note by text, Book, or Topic. Related Notes show their source and Topics, and
+you can follow or remove the link from either Note. Search across the Collection,
 trash, and portability remain later tickets from Spec #2.
 
 ## Editor assets
