@@ -5,11 +5,12 @@ from typing import Any
 from uuid import UUID
 
 from django.db import transaction
+from django.db.models import Case, F, When
 from django.http import Http404
 from django.utils import timezone
 
 from . import note_content, reading
-from .models import Collection, Note
+from .models import Chapter, Collection, Note
 
 MAX_CONTENT_LENGTH = note_content.MAX_CONTENT_LENGTH
 # Leave room for the increment in SQLite's signed 64-bit integer storage.
@@ -70,6 +71,20 @@ def validated_book(collection: Collection, book_id: UUID | None) -> UUID | None:
     return book_id
 
 
+def validated_chapter(
+    collection: Collection, book_id: UUID | None, chapter_id: UUID | None
+) -> UUID | None:
+    if chapter_id is not None and (
+        book_id is None
+        or not Chapter.objects.filter(
+            pk=chapter_id, book_id=book_id, book__collection=collection
+        ).exists()
+    ):
+        message = "Choose a Chapter from the selected Book."
+        raise NoteError(message, fields={"chapter": [message]})
+    return chapter_id
+
+
 def validated_page_number(value: Any) -> int | None:
     if value is None:
         return None
@@ -92,6 +107,7 @@ def capture(
     book: UUID | None = None,
     capture_id: UUID | None = None,
     *,
+    chapter: UUID | None = None,
     page_number: int | None = None,
     source_reference: str = "",
 ) -> tuple[Note, bool]:
@@ -105,8 +121,12 @@ def capture(
         "source_reference": source_reference,
     }
     if capture_id is None:
+        book_id = validated_book(collection, book)
         return Note.objects.create(
-            collection=collection, book_id=validated_book(collection, book), **fields
+            collection=collection,
+            book_id=book_id,
+            chapter_id=validated_chapter(collection, book_id, chapter),
+            **fields,
         ), True
 
     # Compare against the original input, even if the saved Note has been edited.
@@ -114,6 +134,8 @@ def capture(
     # Preserve fingerprints for captures made before these fields existed.
     if page_number is not None or source_reference:
         original_fields.extend([page_number, source_reference])
+    if chapter is not None:
+        original_fields.append({"chapter": str(chapter)})
     original_input = json.dumps(original_fields, sort_keys=True)
     fingerprint = sha256(original_input.encode()).hexdigest()
     captures = Note.objects.filter(collection=collection, capture_id=capture_id)
@@ -121,12 +143,18 @@ def capture(
     created = False
     if note is None:
         book_id = validated_book(collection, book)
+        chapter_id = validated_chapter(collection, book_id, chapter)
         # The unique constraint arbitrates simultaneous retries. get_or_create
         # reads outside its insert transaction, avoiding a SQLite lock upgrade.
         note, created = Note.objects.get_or_create(
             collection=collection,
             capture_id=capture_id,
-            defaults={**fields, "book_id": book_id, "capture_fingerprint": fingerprint},
+            defaults={
+                **fields,
+                "book_id": book_id,
+                "chapter_id": chapter_id,
+                "capture_fingerprint": fingerprint,
+            },
         )
     if note.capture_fingerprint != fingerprint:
         raise NoteError(
@@ -144,6 +172,7 @@ def edit(
     revision: int,
     content: Any = None,
     book: UUID | None | SourceChange = SourceChange.UNCHANGED,
+    chapter: UUID | None | SourceChange = SourceChange.UNCHANGED,
     page_number: int | None | SourceChange = SourceChange.UNCHANGED,
     source_reference: str | SourceChange = SourceChange.UNCHANGED,
 ) -> Note:
@@ -163,6 +192,19 @@ def edit(
         changes.update(content=document, plain_text=text)
     if not isinstance(book, SourceChange):
         changes["book_id"] = validated_book(collection, book)
+        if isinstance(chapter, SourceChange):
+            # Keep the Chapter only when the source Book is unchanged.
+            changes["chapter_id"] = Case(When(book_id=book, then=F("chapter_id")))
+    if not isinstance(chapter, SourceChange):
+        book_id = None
+        if not isinstance(book, SourceChange):
+            book_id = book
+        elif chapter is not None:
+            current = reading.note(collection, note_id)
+            if current.revision != revision:
+                raise NoteConflict(current.revision)
+            book_id = current.book_id
+        changes["chapter_id"] = validated_chapter(collection, book_id, chapter)
     if not isinstance(page_number, SourceChange):
         changes["page_number"] = validated_page_number(page_number)
     if not isinstance(source_reference, SourceChange):

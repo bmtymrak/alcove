@@ -86,8 +86,11 @@ editor converts it to paragraphs when saved. No data migration is needed. A titl
 required. Each Note can have one source Book or none. Book titles need not be
 unique; title alone is enough to create a Book. The library is the signed-in start
 page at `/`, with all Notes still available at `/notes/`. A Book page shows its
-Notes inline, oldest capture first by default, with newest-first and numeric
-Page Number options. A Note can also have a free-text Source Reference for a
+Notes inline, oldest capture first by default, with newest-first, numeric
+Page Number, and Chapter and page options. Use **Manage chapters** on a Book
+page or while capturing or editing a Note to add, rename, and reorder named
+or numbered Chapters. A Note can use one Chapter from its selected Book.
+A Note can also have a free-text Source Reference for a
 range, footnote, or other location. Save and add another retains the selected
 Book and starts with empty location fields. Existing standalone Notes remain
 unassigned after upgrading. Apply the new migrations before starting the server.

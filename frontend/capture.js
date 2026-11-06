@@ -13,6 +13,7 @@ export function explicitCapture(form, editor, draft, initialBook) {
 
   function persist() {
     const unsaved = !editor.isEmpty || (book.value || null) !== initialBook
+      || form.elements.chapter.value
       || form.elements.page_number.value || form.elements.source_reference.value
       || form.hasAttribute('data-bound')
     const value = unsaved

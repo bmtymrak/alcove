@@ -10,13 +10,16 @@ from rest_framework.reverse import reverse
 from rest_framework.serializers import Serializer
 from rest_framework.views import APIView
 
-from . import books, collections, notes, reading
+from . import books, chapters, collections, notes, reading
 from .serializers import (
     BookCreateSerializer,
     BookEditSerializer,
     BookPageSerializer,
     BookSerializer,
     CaptureSerializer,
+    ChapterCreateSerializer,
+    ChapterEditSerializer,
+    ChapterSerializer,
     ConflictSerializer,
     EditSerializer,
     ErrorSerializer,
@@ -194,6 +197,50 @@ class BookView(APIView):
         return Response(BookSerializer(book).data)
 
 
+class BookChaptersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="book_chapters_list",
+        responses={200: ChapterSerializer(many=True), **ERRORS},
+    )
+    def get(self, request: Request, book_id: UUID) -> Response:
+        sequence = reading.book_chapters(collections.for_owner(request.user), book_id)
+        return Response(ChapterSerializer(sequence, many=True).data)
+
+    @extend_schema(
+        operation_id="book_chapters_append",
+        request=ChapterCreateSerializer,
+        responses={201: ChapterSerializer, **WRITE_ERRORS},
+    )
+    def post(self, request: Request, book_id: UUID) -> Response:
+        collection = collections.for_owner(request.user)
+        reading.book(collection, book_id)
+        payload = ChapterCreateSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        chapter = chapters.create(collection, book_id, **payload.validated_data)
+        return Response(ChapterSerializer(chapter).data, status=201)
+
+
+class BookChapterView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="book_chapters_edit",
+        request=ChapterEditSerializer,
+        responses={200: ChapterSerializer, **WRITE_ERRORS},
+    )
+    def patch(self, request: Request, book_id: UUID, chapter_id: UUID) -> Response:
+        collection = collections.for_owner(request.user)
+        reading.book(collection, book_id)
+        payload = ChapterEditSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        chapter = chapters.edit(
+            collection, book_id, chapter_id, **payload.validated_data
+        )
+        return Response(ChapterSerializer(chapter).data)
+
+
 class BookNotesView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -208,7 +255,9 @@ class BookNotesView(APIView):
                 description=(
                     "Default oldest. Newest reverses capture order. Page sorts "
                     "numerically with missing pages last and oldest captures first "
-                    "for ties. UUID breaks final ties."
+                    "for ties. Chapter follows the Book's sequence with missing "
+                    "Chapters last, then the same page and capture ordering. "
+                    "UUID breaks final ties."
                 ),
             ),
         ],

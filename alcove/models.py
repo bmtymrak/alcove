@@ -19,10 +19,23 @@ class Book(models.Model):
         ordering = ["title", "id"]
 
 
+class Chapter(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE)
+    label = models.CharField(max_length=300)
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["position", "id"]
+
+
 class Note(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
     book = models.ForeignKey(Book, null=True, blank=True, on_delete=models.SET_NULL)
+    chapter = models.ForeignKey(
+        Chapter, null=True, blank=True, on_delete=models.SET_NULL
+    )
     page_number = models.PositiveIntegerField(null=True, blank=True)
     source_reference = models.TextField(blank=True, default="")
     content = models.JSONField()

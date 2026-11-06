@@ -4,7 +4,7 @@ from uuid import UUID
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from . import notes
+from . import chapters, notes
 
 
 class StrictSerializer(serializers.Serializer):
@@ -24,7 +24,7 @@ class ContentField(serializers.JSONField):
         return notes.validated_content(data)[0]
 
 
-class CaptureIdentityField(serializers.UUIDField):
+class StrictUUIDField(serializers.UUIDField):
     def to_internal_value(self, data: Any) -> UUID:
         if not isinstance(data, str):
             self.fail("invalid")
@@ -52,6 +52,14 @@ class PageNumberField(serializers.IntegerField):
 
 class NoteSourceSerializer(StrictSerializer):
     book = serializers.UUIDField(required=False, allow_null=True)
+    chapter = StrictUUIDField(
+        required=False,
+        allow_null=True,
+        help_text=(
+            "Chapter of the selected Book. Null clears it. An omitted Chapter "
+            "is cleared when the Book changes."
+        ),
+    )
     page_number = PageNumberField(
         required=False,
         allow_null=True,
@@ -71,7 +79,7 @@ class NoteSourceSerializer(StrictSerializer):
 
 class CaptureSerializer(NoteSourceSerializer):
     content = ContentField()
-    capture_id = CaptureIdentityField(
+    capture_id = StrictUUIDField(
         required=False,
         help_text=(
             "Use a new UUID for each capture. Retry the same content and source "
@@ -95,6 +103,8 @@ class NoteSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     content = ContentField()
     book = serializers.UUIDField(source="book_id", allow_null=True)
+    chapter = serializers.UUIDField(source="chapter_id", allow_null=True)
+    chapter_label = serializers.CharField(source="chapter.label", allow_null=True)
     page_number = serializers.IntegerField(
         allow_null=True, min_value=1, max_value=notes.MAX_PAGE_NUMBER
     )
@@ -160,3 +170,31 @@ class BookPageSerializer(serializers.Serializer):
     page = serializers.IntegerField(min_value=1)
     page_size = serializers.IntegerField()
     results = BookSerializer(many=True)
+
+
+class ChapterLabelField(serializers.CharField):
+    def to_internal_value(self, data: Any) -> str:
+        if not isinstance(data, str):
+            self.fail("invalid")
+        return super().to_internal_value(data)
+
+
+class ChapterCreateSerializer(StrictSerializer):
+    label = ChapterLabelField(max_length=chapters.MAX_LABEL_LENGTH)  # type: ignore[assignment]
+
+
+class ChapterEditSerializer(StrictSerializer):
+    label = ChapterLabelField(  # type: ignore[assignment]
+        max_length=chapters.MAX_LABEL_LENGTH, required=False
+    )
+    position = StrictIntegerField(
+        min_value=1,
+        required=False,
+        help_text="Move to this one-based position. Intervening Chapters shift.",
+    )
+
+
+class ChapterSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    label = serializers.CharField(max_length=chapters.MAX_LABEL_LENGTH)  # type: ignore[assignment]
+    position = serializers.IntegerField(min_value=1)

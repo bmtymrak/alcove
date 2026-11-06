@@ -37,7 +37,8 @@
   <section id="save-conflict" aria-label="Review conflict" hidden>
     <h2>Current saved note</h2>
     <p>Revision <span data-current-revision></span> · Source: <span data-current-source></span></p>
-    <p>Page number: <span data-current-page></span><br>
+    <p>Chapter: <span data-current-chapter></span><br>
+      Page number: <span data-current-page></span><br>
       Source reference: <span data-current-reference></span></p>
     <pre data-current-content></pre>
     <p>Your pending version remains in this form. Reconcile your changes before saving your version over the reviewed revision.</p>
@@ -54,6 +55,10 @@
   </details>
   {{ form.book.errors }}
   {{ form.book.label_tag }}{{ form.book }}
+  {{ form.chapter.errors }}
+  {{ form.chapter.label_tag }}{{ form.chapter }}
+  {{ form.chapter_options|json_script:"chapter-options" }}
+  {% include "alcove/chapter_manager.html" %}
   {{ form.page_number.errors }}
   {{ form.page_number.label_tag }}{{ form.page_number }}
   {{ form.source_reference.errors }}

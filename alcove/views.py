@@ -53,6 +53,7 @@ def capture(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse:
         request.POST if request.method == "POST" else None,
         initial={"book": book.id} if book else None,
         book_options=reading.book_options(collection),
+        chapter_options=reading.chapter_options(collection),
     )
     status = 400 if form.is_bound else 200
     if request.method == "POST" and form.is_valid():
@@ -62,6 +63,7 @@ def capture(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse:
                 form.cleaned_data["document"],
                 book=form.cleaned_data["book"],
                 capture_id=form.cleaned_data["capture_id"],
+                chapter=form.cleaned_data["chapter"],
                 page_number=form.cleaned_data["page_number"],
                 source_reference=form.cleaned_data["source_reference"],
             )
@@ -107,10 +109,12 @@ def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
             ),
             "revision": note.revision,
             "book": note.book_id,
+            "chapter": note.chapter_id,
             "page_number": note.page_number,
             "source_reference": note.source_reference,
         },
         book_options=reading.book_options(collection),
+        chapter_options=reading.chapter_options(collection),
     )
     status = 400 if form.is_bound else 200
     if request.method == "POST" and form.is_valid():
@@ -123,7 +127,7 @@ def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
                 book=form.cleaned_data["book"],
                 **{
                     field: form.cleaned_data[field]
-                    for field in ("page_number", "source_reference")
+                    for field in ("chapter", "page_number", "source_reference")
                     if field in request.POST
                 },
             )
@@ -166,14 +170,16 @@ def index(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_GET
 def book_detail(request: HttpRequest, book_id: UUID) -> HttpResponse:
-    book = reading.book(collections.for_owner(request.user), book_id)
+    collection = collections.for_owner(request.user)
+    book = reading.book(collection, book_id)
     return render(
         request,
         "alcove/book.html",
         {
             "book": book,
+            "chapters": reading.book_chapters(collection, book_id),
             "notes": reading.book_notes(
-                collections.for_owner(request.user),
+                collection,
                 book_id,
                 request.GET.get("page", "1"),
                 request.GET.get("order", "oldest"),

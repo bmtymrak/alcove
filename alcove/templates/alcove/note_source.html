@@ -1,6 +1,7 @@
 {% if note.book or note.page_number or note.source_reference %}
 <p class="metadata">
-  {% if note.book %}Source: <a href="{% url 'book' note.book.id %}">{{ note.book.title }}</a>{% if note.book.author %} · {{ note.book.author }}{% endif %}{% if note.page_number or note.source_reference %}<br>{% endif %}{% endif %}
+  {% if note.book %}Source: <a href="{% url 'book' note.book.id %}">{{ note.book.title }}</a>{% if note.book.author %} · {{ note.book.author }}{% endif %}{% if note.chapter or note.page_number or note.source_reference %}<br>{% endif %}{% endif %}
+  {% if note.chapter %}<span>Chapter: {{ note.chapter.label }}</span>{% if note.page_number or note.source_reference %}<br>{% endif %}{% endif %}
   {% if note.page_number %}<span>Page {{ note.page_number }}</span>{% if note.source_reference %}<br>{% endif %}{% endif %}
   {% if note.source_reference %}<span>Source reference: {{ note.source_reference|linebreaksbr }}</span>{% endif %}
 </p>

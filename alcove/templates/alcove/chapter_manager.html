@@ -1,0 +1,13 @@
+<details data-chapter-manager{% if book %} data-chapter-book="{{ book.id }}"{% else %} hidden{% endif %}>
+  <summary>Manage chapters</summary>
+  <ol data-chapter-list>
+    {% for chapter in chapters %}<li>{{ chapter.label }}</li>{% endfor %}
+  </ol>
+  <div data-chapter-actions hidden>
+    {% if book %}{% csrf_token %}{% endif %}
+    <label for="new-chapter-label">New chapter label</label>
+    <input id="new-chapter-label" maxlength="300" placeholder="e.g. Prologue or 1">
+    <button type="button" data-chapter-add>Add chapter</button>
+    <p role="status" data-chapter-status></p>
+  </div>
+</details>

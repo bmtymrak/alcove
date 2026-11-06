@@ -3,12 +3,12 @@ import { readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 const result = await build({
-  entryPoints: ['frontend/editor.js'],
+  entryPoints: ['frontend/editor.js', 'frontend/chapters.js'],
   bundle: true,
   minify: true,
   target: 'es2020',
   supported: { 'template-literal': false },
-  outfile: 'alcove/static/alcove/editor.js',
+  outdir: 'alcove/static/alcove',
   metafile: true,
   banner: { js: '/*! Third-party licenses: editor.NOTICES.txt */' },
 })

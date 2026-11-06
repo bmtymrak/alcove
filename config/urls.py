@@ -21,6 +21,16 @@ urlpatterns = [
     path("notes/", views.note_list, name="notes"),
     path("api/v1/books/", api.BooksView.as_view(), name="api-books"),
     path("api/v1/books/<uuid:book_id>/", api.BookView.as_view(), name="api-book"),
+    path(
+        "api/v1/books/<uuid:book_id>/chapters/",
+        api.BookChaptersView.as_view(),
+        name="api-book-chapters",
+    ),
+    path(
+        "api/v1/books/<uuid:book_id>/chapters/<uuid:chapter_id>/",
+        api.BookChapterView.as_view(),
+        name="api-book-chapter",
+    ),
     path("notes/new/", views.capture, name="capture"),
     path("notes/<uuid:note_id>/", views.detail, name="note"),
     path("notes/<uuid:note_id>/edit/", views.edit, name="edit"),

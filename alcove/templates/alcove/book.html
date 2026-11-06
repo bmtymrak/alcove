@@ -1,18 +1,22 @@
 {% extends "alcove/base.html" %}
+{% load static %}
 {% block title %}{{ book.title }} · Alcove{% endblock %}
 {% block content %}
 <a href="{% url 'index' %}">← Book library</a>
 <h1>{{ book.title }}</h1>
 {% if book.author %}<p>{{ book.author }}</p>{% endif %}
 <div class="actions"><a class="button" href="{% url 'book-capture' book.id %}">Capture a note from this book</a><a href="{% url 'book-edit' book.id %}">Edit book</a></div>
+{% include "alcove/chapter_manager.html" %}
 <form method="get" class="actions">
   <label for="order">Note order</label>
   <select name="order" id="order">
     <option value="oldest"{% if order == 'oldest' %} selected{% endif %}>Oldest first</option>
     <option value="newest"{% if order == 'newest' %} selected{% endif %}>Newest first</option>
     <option value="page"{% if order == 'page' %} selected{% endif %}>Page number</option>
+    <option value="chapter"{% if order == 'chapter' %} selected{% endif %}>Chapter and page</option>
   </select>
   <button>Apply order</button>
 </form>
 {% include "alcove/note_list.html" %}
+<script src="{% static 'alcove/chapters.js' %}" defer></script>
 {% endblock %}

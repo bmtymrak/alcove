@@ -582,3 +582,99 @@ def test_switching_books_keeps_each_draft_and_starts_the_next_capture_fresh(
     )
     page.get_by_role("link", name="Resume previous capture").click()
     expect(page.get_by_label("Your note")).to_have_text("Draft for Second source.")
+
+
+def test_capture_manage_and_browse_chapters_on_phone(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    sign_in(page, live_server)
+    page.get_by_role("link", name="Add a book", exact=True).click()
+    page.get_by_label("Title").fill("Collected essays")
+    page.get_by_role("button", name="Save book", exact=True).click()
+    book_url = page.url
+    page.get_by_role("link", name="Capture a note from this book").click()
+    editor = page.get_by_label("Your note")
+    chapter = page.get_by_label("Chapter:", exact=True)
+    manager = page.get_by_text("Manage chapters", exact=True)
+    new_label = page.get_by_label("New chapter label")
+    chapter_endpoint = "**/api/v1/books/*/chapters/"
+    initial_list = []
+
+    def delay_initial_list(route):
+        if route.request.method == "GET" and not initial_list:
+            initial_list.append((route, route.fetch()))
+        else:
+            route.continue_()
+
+    editor.fill("A note in the first numbered chapter.")
+    page.route(chapter_endpoint, delay_initial_list)
+    with page.expect_request(lambda request: request.url.endswith("/chapters/")):
+        manager.click()
+    new_label.fill("1")
+    page.get_by_role("button", name="Add chapter", exact=True).click()
+    expect(page.get_by_role("textbox", name="Chapter 1 label")).to_have_value("1")
+    route, stale_list = initial_list.pop()
+    route.fulfill(response=stale_list)
+    page.wait_for_load_state("networkidle")
+    page.unroute(chapter_endpoint)
+    expect(chapter.locator("option:checked")).to_have_text("1")
+    page.reload()
+    expect(editor).to_have_text("A note in the first numbered chapter.")
+    expect(chapter.locator("option:checked")).to_have_text("1")
+    page.get_by_role("button", name="Save and add another", exact=True).click()
+    expect(editor).to_have_text("")
+    expect(chapter).to_have_value("")
+
+    editor.fill("A note in the opening chapter.")
+    manager.click()
+    new_label.fill("Introduction")
+
+    def select_while_appending(route):
+        if route.request.method == "POST":
+            chapter.select_option(label="1")
+        route.continue_()
+
+    page.route(chapter_endpoint, select_while_appending)
+    page.get_by_role("button", name="Add chapter", exact=True).click()
+    expect(chapter.locator("option")).to_have_text(["No chapter", "1", "Introduction"])
+    page.unroute(chapter_endpoint)
+    expect(chapter.locator("option:checked")).to_have_text("1")
+    chapter.select_option(label="Introduction")
+    page.get_by_role("textbox", name="Chapter 2 label").fill("Prologue")
+    page.get_by_role("button", name="Save chapter 2 label").click()
+    expect(chapter.locator("option:checked")).to_have_text("Prologue")
+    page.get_by_role("button", name="Move chapter 2 up").click()
+    expect(page.get_by_role("textbox", name="Chapter 1 label")).to_have_value(
+        "Prologue"
+    )
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    page.get_by_role("button", name="Save note", exact=True).click()
+    expect(page.get_by_text("Chapter: Prologue", exact=True)).to_be_visible()
+    detail = page.url
+
+    page.goto(book_url)
+    page.get_by_label("Note order").select_option("chapter")
+    page.get_by_role("button", name="Apply order").click()
+    expect(page.locator(".note-content")).to_have_text(
+        [
+            "A note in the opening chapter.",
+            "A note in the first numbered chapter.",
+        ]
+    )
+    manager.click()
+    page.get_by_role("button", name="Move chapter 2 up").click()
+    expect(page.locator(".note-content")).to_have_text(
+        [
+            "A note in the first numbered chapter.",
+            "A note in the opening chapter.",
+        ]
+    )
+    page.goto(detail + "edit/")
+    chapter.select_option(label="1")
+    expect(page.locator("#save-status")).to_have_text("Saved.")
+    page.reload()
+    expect(chapter.locator("option:checked")).to_have_text("1")
+    page.get_by_label("Source book").select_option("")
+    expect(chapter).to_have_value("")
+    expect(page.locator("#save-status")).to_have_text("Saved.")
+    page.goto(detail)
+    expect(page.get_by_text("Chapter:", exact=False)).to_have_count(0)

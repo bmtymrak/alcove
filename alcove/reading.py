@@ -5,20 +5,26 @@ from django.db.models import F
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 
-from .models import Book, Collection, Note
+from .models import Book, Chapter, Collection, Note
 
 PAGE_SIZE = 20
+CAPTURE_ORDER = ("captured_at", "id")
+PAGE_ORDER = (F("page_number").asc(nulls_last=True), *CAPTURE_ORDER)
 BOOK_NOTE_ORDERING = {
-    "oldest": ("captured_at", "id"),
+    "oldest": CAPTURE_ORDER,
     "newest": ("-captured_at", "-id"),
-    "page": (F("page_number").asc(nulls_last=True), "captured_at", "id"),
+    "page": PAGE_ORDER,
+    "chapter": (F("chapter__position").asc(nulls_last=True), *PAGE_ORDER),
 }
 
 
 def notes(collection: Collection, page: int | str = 1) -> Page[Note]:
     try:
         return Paginator(
-            Note.objects.filter(collection=collection).select_related("book"), PAGE_SIZE
+            Note.objects.filter(collection=collection).select_related(
+                "book", "chapter"
+            ),
+            PAGE_SIZE,
         ).page(page)
     except InvalidPage as exc:
         raise Http404("Page not found.") from exc
@@ -26,7 +32,9 @@ def notes(collection: Collection, page: int | str = 1) -> Page[Note]:
 
 def note(collection: Collection, note_id: UUID) -> Note:
     return get_object_or_404(
-        Note.objects.select_related("book"), collection=collection, pk=note_id
+        Note.objects.select_related("book", "chapter"),
+        collection=collection,
+        pk=note_id,
     )
 
 
@@ -41,6 +49,23 @@ def library(collection: Collection, page: int | str = 1) -> Page[Book]:
 
 def book(collection: Collection, book_id: UUID) -> Book:
     return get_object_or_404(Book, collection=collection, pk=book_id)
+
+
+def book_chapters(collection: Collection, book_id: UUID) -> list[Chapter]:
+    return list(Chapter.objects.filter(book=book(collection, book_id)))
+
+
+def chapter_options(collection: Collection) -> dict[str, list[dict[str, str | int]]]:
+    options: dict[str, list[dict[str, str | int]]] = {}
+    for chapter in Chapter.objects.filter(book__collection=collection):
+        options.setdefault(str(chapter.book_id), []).append(
+            {
+                "id": str(chapter.id),
+                "label": chapter.label,
+                "position": chapter.position,
+            }
+        )
+    return options
 
 
 def book_options(collection: Collection) -> list[tuple[str, str]]:
@@ -59,7 +84,7 @@ def book_notes(
     try:
         return Paginator(
             Note.objects.filter(collection=collection, book_id=book_id)
-            .select_related("book")
+            .select_related("book", "chapter")
             .order_by(*BOOK_NOTE_ORDERING[order]),
             PAGE_SIZE,
         ).page(page)

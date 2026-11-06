@@ -25,6 +25,12 @@ button.quiet { background: transparent; color: #315c40; }
 #save-conflict pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .metadata { color: #536549; font-size: 0.85rem; }
 .actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 1.25rem; }
+[data-chapter-manager] { margin: 1rem 0; }
+[data-chapter-manager] summary { cursor: pointer; }
+[data-chapter-list] li { margin: 0.75rem 0; }
+.chapter-buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0; }
+.chapter-buttons button { padding-inline: 0.65rem; }
+button:disabled { opacity: 0.55; cursor: default; }
 @media (max-width: 480px) { header { padding: 1rem; align-items: flex-start; } main { padding: 1.5rem 1rem; } .panel { padding: 1rem; } nav { justify-content: flex-end; gap: 0.5rem; } }
 
 [hidden] { display: none !important; }

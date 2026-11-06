@@ -19,7 +19,11 @@ class NoteForm(forms.Form):
     document_rejected = False
 
     def __init__(
-        self, *args: Any, book_options: list[tuple[str, str]], **kwargs: Any
+        self,
+        *args: Any,
+        book_options: list[tuple[str, str]],
+        chapter_options: dict[str, list[dict[str, str | int]]],
+        **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.fields["book"] = forms.TypedChoiceField(
@@ -28,6 +32,20 @@ class NoteForm(forms.Form):
             coerce=UUID,
             empty_value=None,
             choices=[("", "No source book"), *book_options],
+        )
+        self.chapter_options = chapter_options
+        self.fields["chapter"] = forms.UUIDField(
+            required=False,
+            widget=forms.Select(
+                choices=[
+                    ("", "No chapter"),
+                    *(
+                        (title, [(item["id"], item["label"]) for item in chapters])
+                        for book_id, title in book_options
+                        if (chapters := chapter_options.get(book_id))
+                    ),
+                ]
+            ),
         )
         if self.initial.get("content_document"):
             self.fields["content"].widget.attrs["readonly"] = True

@@ -187,6 +187,165 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: Send application/json.
+  /api/v1/books/{book_id}/chapters/:
+    get:
+      operationId: book_chapters_list
+      parameters:
+      - in: path
+        name: book_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - books
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Chapter'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+    post:
+      operationId: book_chapters_append
+      parameters:
+      - in: path
+        name: book_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - books
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChapterCreateRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chapter'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
+  /api/v1/books/{book_id}/chapters/{chapter_id}/:
+    patch:
+      operationId: book_chapters_edit
+      parameters:
+      - in: path
+        name: book_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: chapter_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - books
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChapterEditRequest'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chapter'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
   /api/v1/books/{book_id}/notes/:
     get:
       operationId: books_notes
@@ -202,12 +361,14 @@ paths:
         schema:
           type: string
           enum:
+          - chapter
           - newest
           - oldest
           - page
         description: Default oldest. Newest reverses capture order. Page sorts numerically
-          with missing pages last and oldest captures first for ties. UUID breaks
-          final ties.
+          with missing pages last and oldest captures first for ties. Chapter follows
+          the Book's sequence with missing Chapters last, then the same page and capture
+          ordering. UUID breaks final ties.
       - in: query
         name: page
         schema:
@@ -518,6 +679,13 @@ components:
           - string
           - 'null'
           format: uuid
+        chapter:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Chapter of the selected Book. Null clears it. An omitted Chapter
+            is cleared when the Book changes.
         page_number:
           type:
           - integer
@@ -538,6 +706,42 @@ components:
             source with the same UUID to receive the existing Note.
       required:
       - content
+    Chapter:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+          maxLength: 300
+        position:
+          type: integer
+          minimum: 1
+      required:
+      - id
+      - label
+      - position
+    ChapterCreateRequest:
+      type: object
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 300
+      required:
+      - label
+    ChapterEditRequest:
+      type: object
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 300
+        position:
+          type: integer
+          minimum: 1
+          description: Move to this one-based position. Intervening Chapters shift.
     Conflict:
       type: object
       properties:
@@ -573,6 +777,13 @@ components:
           - string
           - 'null'
           format: uuid
+        chapter:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Chapter of the selected Book. Null clears it. An omitted Chapter
+            is cleared when the Book changes.
         page_number:
           type:
           - integer
@@ -629,6 +840,15 @@ components:
           - string
           - 'null'
           format: uuid
+        chapter:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        chapter_label:
+          type:
+          - string
+          - 'null'
         page_number:
           type:
           - integer
@@ -652,6 +872,8 @@ components:
       required:
       - book
       - captured_at
+      - chapter
+      - chapter_label
       - content
       - id
       - page_number

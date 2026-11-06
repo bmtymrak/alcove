@@ -4,6 +4,7 @@ import { Link } from '@tiptap/extension-link'
 import { OrderedList } from '@tiptap/extension-list'
 import { autosave } from './autosave'
 import { explicitCapture } from './capture'
+import { noteChapters } from './chapters'
 import { noteDraft, noteSourceInputs } from './drafts'
 
 const form = document.querySelector('[data-note-editor]')
@@ -28,6 +29,7 @@ function initializeEditor(form) {
   const host = document.querySelector('#editor-host')
   const book = form.querySelector('[name="book"]')
   const draft = noteDraft(form)
+  const syncChapter = noteChapters(form)
   const initialBook = book.value || null
   let editor
   let changed = () => {}
@@ -40,6 +42,7 @@ function initializeEditor(form) {
     if (recovered) {
       source.value = JSON.stringify(stored)
       for (const input of noteSourceInputs(form)) {
+        if (input.name === 'chapter') syncChapter(recovered.chapter)
         if (input.name in recovered) input.value = recovered[input.name] ?? ''
       }
     }

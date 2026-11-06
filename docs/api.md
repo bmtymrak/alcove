@@ -1,7 +1,7 @@
 # JSON API v1
 
-The API and rendered pages use the same session and shared Collection, Book, Note, and
-Reading interfaces. All endpoints below, including `/api/v1/schema/`, require
+The API and rendered pages use the same session and shared Collection, Book,
+Chapter, Note, and Reading interfaces. All endpoints below, including `/api/v1/schema/`, require
 sign-in. Get `/login/`, then POST the username, password, and CSRF token from that
 page. There is no registration endpoint. Django rotates the CSRF token at login;
 use the new `csrftoken` cookie afterward. POST `/logout/` with CSRF to revoke the
@@ -19,6 +19,9 @@ checks schema drift and validates real request/response examples against it.
 | Add a Book | `POST /api/v1/books/` | `201`, with a relative `Location` header |
 | Read a Book | `GET /api/v1/books/{uuid}/` | `200` |
 | Edit Book metadata | `PATCH /api/v1/books/{uuid}/` | `200` |
+| List a Book's Chapters | `GET /api/v1/books/{book_id}/chapters/` | `200`, an ordered array |
+| Append a Chapter | `POST /api/v1/books/{book_id}/chapters/` | `201` |
+| Rename or move a Chapter | `PATCH /api/v1/books/{book_id}/chapters/{chapter_id}/` | `200` |
 | Read a Book's Notes | `GET /api/v1/books/{uuid}/notes/?order=oldest&page=1` | `200` |
 | List Notes | `GET /api/v1/notes/?page=1` | `200` |
 | Capture a Note | `POST /api/v1/notes/` | `201` on creation or `200` on replay, both with a relative `Location` header |
@@ -32,6 +35,17 @@ A Book response has `id` (stable UUID), `title`, and `author`. PATCH updates onl
 submitted metadata fields; `{"author": ""}` clears the author. Null values and
 unknown fields are rejected. Book metadata edits currently use last-write-wins.
 
+The Chapter list contains the full sequence in reading order and can be empty.
+Each Chapter has a stable UUID `id`, a string `label`, and a one-based integer
+`position`. Send `{"label": "Prologue"}` to append to the end. Labels are trimmed
+and must contain 1–300 characters. Use strings such as `"1"` for numbered Chapters.
+PATCH accepts either or both of `label` and `position`. Moving to a position
+between 1 and the current Chapter count shifts the intervening Chapters.
+Moves and appends apply atomically to the current sequence. Fetch the list
+again to read all positions after a move. An invalid label or position returns
+`400`. A Book outside the signed-in Collection or a Chapter outside the URL's
+Book returns `404`.
+
 Capture body:
 
 ```json
@@ -40,6 +54,10 @@ Capture body:
 
 Capture may also include `"book": "<book-uuid>"`; omission or null creates a
 standalone Note. Each Note has at most one source Book.
+Send `"chapter": "<chapter-uuid>"` to associate a Chapter of that Book.
+Omission or null leaves the Chapter unset. A Chapter that does not belong to
+the selected Book returns a `400` field error on `chapter`. This also applies
+to unknown Chapters and to any non-null Chapter when the Book is unset.
 
 Send an optional `"page_number": 42` for the starting page and
 `"source_reference": "pp. 42–44, footnote 3"` for the written location. Either
@@ -51,7 +69,7 @@ and the empty string for the reference.
 Send an optional `"capture_id": "<uuid>"` to make a capture safe to retry.
 Generate a fresh UUID for each new capture, even when two Notes have identical
 content and source. After a timeout or lost response, resend the same UUID,
-document, Book, Page Number, and Source Reference. The first successful request
+document, Book, Chapter, Page Number, and Source Reference. The first successful request
 creates the Note and returns `201`. A replay returns `200` and the current
 representation of the same Note,
 including any later edits. Both responses include its `Location`. The identity
@@ -68,13 +86,16 @@ sent, replaces the complete document:
 ```
 
 Send `{"book": "<book-uuid>", "revision": 1}` to assign or change the source,
-or `{"book": null, "revision": 1}` to clear it. Send `"page_number": null` or
-`"source_reference": ""` to clear those fields. PATCH preserves omitted fields.
+or `{"book": null, "revision": 1}` to clear it. Send `"chapter": null`,
+`"page_number": null`, or `"source_reference": ""` to clear those fields. PATCH
+preserves omitted fields, except that changing or clearing the Book clears
+its Chapter unless a Chapter of the new Book is explicitly supplied.
 Source changes use the same revision precondition as content. A stale change
 returns `409` without saving. Another Collection's
 Book and an unknown Book both produce a `400` field error on `book` without saving.
 
-A Note response has `id` (stable UUID), `book` (UUID or null), `page_number`
+A Note response has `id` (stable UUID), `book` and `chapter` (UUIDs or null),
+`chapter_label` (the current label or null), `page_number`
 (integer or null), `source_reference` (string), `content` (canonical document), `plain_text`
 (derived text), `captured_at` and `updated_at` (UTC ISO 8601), and `revision`
 (positive integer starting at 1). Editing preserves identity and capture time and
@@ -150,14 +171,17 @@ same text/length/nonempty rules. The browser converts them to paragraphs on save
 retaining their text. No Note requires a title or type, and quotations and
 commentary can coexist in one document. Unknown request fields are rejected.
 
-List results have `count`, `page`, `page_size` (20), and `results`. Pages start at 1;
+Book and Note list results have `count`, `page`, `page_size` (20), and `results`. Pages start at 1;
 an empty Collection has an empty page 1. Invalid/out-of-range pages return `404`.
 The all-Notes list is oldest capture first, then UUID as the deterministic
 tiebreaker. The library is ordered by title then UUID. A Book's Notes use the same
 pagination envelope, scoped to that Book, with `order=oldest` by default or
 `order=newest` to reverse both capture timestamp and UUID. `order=page` sorts by
-ascending numeric Page Number with missing pages last. Ties use oldest capture
-first, then ascending UUID. Invalid ordering returns `404`. HTML Book pages use
+ascending numeric Page Number with missing pages last. `order=chapter` sorts
+by the Book's explicit Chapter positions with unassigned Notes last. Within
+each Chapter and among unassigned Notes, it uses the same numeric page ordering.
+Both modes break ties by oldest capture first, then ascending UUID.
+Invalid ordering returns `404`. HTML Book pages use
 the same ordering and pagination and retain the selected
 order across pages. No search or general Note filters are supported yet.
 
@@ -173,7 +197,7 @@ Errors use the following envelope (field values may be nested for document error
 | --- | --- |
 | `400` | Invalid/missing/unknown fields (`invalid`) or malformed JSON (`parse_error`). |
 | `403` | Sign-in required (`not_authenticated`) or failed CSRF (`permission_denied`). |
-| `404` | Book, Note, order, or page not found in the current Collection (`not_found`). |
+| `404` | Book, Chapter, Note, order, or page not found at the requested route (`not_found`). |
 | `405` | Unsupported method (`method_not_allowed`). |
 | `409` | Stale edit revision (`conflict`) or capture UUID reused for different input (`capture_conflict`). |
 | `415` | Unsupported request media type (`unsupported_media_type`). |

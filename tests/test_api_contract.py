@@ -246,3 +246,41 @@ def test_capture_retry_contract_matches_real_responses(signed_in):
     )
     validate_response(conflict, COLLECTION, "post", 409)
     assert conflict.json()["error"]["code"] == "capture_conflict"
+
+
+def test_chapter_contract_matches_real_requests_and_responses(signed_in):
+    book = json_request(
+        signed_in, "post", "/api/v1/books/", {"title": "A documented Book"}
+    ).json()
+    chapters = "/api/v1/books/{book_id}/chapters/"
+    chapter_detail = chapters + "{chapter_id}/"
+    path = chapters.format(book_id=book["id"])
+    payload = {"label": "Prologue"}
+    validate_request(payload, chapters, "post")
+    response = json_request(signed_in, "post", path, payload)
+    validate_response(response, chapters, "post", 201)
+    chapter = response.json()
+    validate_response(signed_in.get(path), chapters, "get", 200)
+    payload = {"position": 1, "label": "1"}
+    validate_request(payload, chapter_detail, "patch")
+    validate_response(
+        json_request(signed_in, "patch", path + chapter["id"] + "/", payload),
+        chapter_detail,
+        "patch",
+        200,
+    )
+    payload = {
+        "content": document("A sourced thought."),
+        "book": book["id"],
+        "chapter": chapter["id"],
+    }
+    validate_request(payload, COLLECTION, "post")
+    response = json_request(signed_in, "post", COLLECTION, payload)
+    validate_response(response, COLLECTION, "post", 201)
+    assert response.json()["chapter_label"] == "1"
+    validate_response(
+        signed_in.get(path.replace("chapters/", "notes/?order=chapter")),
+        "/api/v1/books/{book_id}/notes/",
+        "get",
+        200,
+    )

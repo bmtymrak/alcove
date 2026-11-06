@@ -74,6 +74,7 @@ export function noteSnapshot(form) {
   return JSON.stringify({
     content: JSON.parse(form.querySelector('[name="content_document"]').value),
     book: form.elements.book.value || null,
+    chapter: form.elements.chapter.value || null,
     page_number: pageText && /^[0-9]+$/.test(pageText) && Number.isSafeInteger(page)
       ? page : pageText || null,
     source_reference: form.elements.source_reference.value,
@@ -81,5 +82,8 @@ export function noteSnapshot(form) {
 }
 
 export function noteSourceInputs(form) {
-  return [form.elements.book, form.elements.page_number, form.elements.source_reference]
+  return [
+    form.elements.book, form.elements.chapter,
+    form.elements.page_number, form.elements.source_reference,
+  ]
 }
