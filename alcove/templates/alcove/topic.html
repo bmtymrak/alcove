@@ -1,0 +1,11 @@
+{% extends "alcove/base.html" %}
+{% block title %}{{ topic.full_path }} · Alcove{% endblock %}
+{% block content %}
+<h1>{{ topic.full_path }}</h1>
+{% include "alcove/topic_navigation.html" with current=topic %}
+<nav aria-label="Topic mode">
+  <a href="?mode=branch"{% if mode == 'branch' %} aria-current="page"{% endif %}>Include descendants</a>
+  <a href="?mode=direct"{% if mode == 'direct' %} aria-current="page"{% endif %}>Direct assignments only</a>
+</nav>
+{% include "alcove/note_list.html" with empty_message="No Notes match this Topic mode." %}
+{% endblock %}

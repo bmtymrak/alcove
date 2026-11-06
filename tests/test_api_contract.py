@@ -50,6 +50,7 @@ def test_documented_successes_and_errors_match_real_http_responses(signed_in):
     validate_response(
         json_request(signed_in, "patch", path, payload), DETAIL, "patch", 200
     )
+
     conflict = json_request(signed_in, "patch", path, payload)
     validate_response(conflict, DETAIL, "patch", 409)
     assert conflict.json()["error"]["code"] == "conflict"
@@ -318,3 +319,36 @@ def test_topic_contract_matches_real_http_requests_and_responses(signed_in):
     validate_response(
         json_request(signed_in, "patch", path, payload), DETAIL, "patch", 200
     )
+
+
+def test_topic_browsing_and_book_group_contracts_match_real_responses(signed_in):
+    book = json_request(
+        signed_in, "post", "/api/v1/books/", {"title": "A documented Book"}
+    ).json()
+    topic = json_request(signed_in, "post", "/api/v1/topics/", {"label": "Arts"}).json()
+    for changes in ([{"action": "assign", "topic": topic["id"]}], []):
+        response = json_request(
+            signed_in,
+            "post",
+            COLLECTION,
+            {
+                "content": document("An observation"),
+                "book": book["id"],
+                "topic_changes": changes,
+            },
+        )
+        assert response.status_code == 201
+
+    topic_notes = "/api/v1/topics/{topic_id}/notes/"
+    notes_path = topic_notes.format(topic_id=topic["id"])
+    validate_response(signed_in.get(notes_path), topic_notes, "get", 200)
+    validate_response(
+        signed_in.get(notes_path + "?mode=direct"), topic_notes, "get", 200
+    )
+    validate_response(
+        signed_in.get(notes_path + "?mode=invalid"), topic_notes, "get", 404
+    )
+    groups = "/api/v1/books/{book_id}/note-groups/"
+    group_path = groups.format(book_id=book["id"])
+    validate_response(signed_in.get(group_path), groups, "get", 200)
+    validate_response(signed_in.get(group_path + "?page=0"), groups, "get", 404)

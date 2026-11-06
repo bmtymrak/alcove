@@ -721,3 +721,53 @@ def test_topic_picker_recovers_capture_and_autosaves_replacement(
     expect(page.get_by_role("status")).to_have_text("Saved.")
     page.reload()
     expect(page.get_by_role("button", name="Remove Arts", exact=True)).to_have_count(0)
+
+
+def test_browse_topic_modes_and_autosave_a_grouped_note(page, live_server):
+    sign_in(page, live_server)
+    page.get_by_role("link", name="Topics", exact=True).click()
+    for label, parent in [("Arts", None), ("History", "Arts"), ("Science", None)]:
+        page.get_by_label("Label").fill(label)
+        if parent:
+            page.get_by_label("Parent").select_option(label=parent)
+        page.get_by_role("button", name="Create Topic").click()
+
+    page.get_by_role("link", name="Books", exact=True).click()
+    page.get_by_role("link", name="Add a book", exact=True).click()
+    page.get_by_label("Title").fill("Ways of Seeing")
+    page.get_by_role("button", name="Save book").click()
+    book_url = page.url
+    page.get_by_role("link", name="Capture a note from this book").click()
+    page.get_by_label("Your note").fill("A shared observation.")
+    picker = page.get_by_label("Find a Topic")
+    picker.fill("History")
+    page.get_by_role("button", name="Arts › History", exact=True).click()
+    picker.fill("Science")
+    page.get_by_role("button", name="Science", exact=True).click()
+    page.get_by_role("button", name="Save note", exact=True).click()
+
+    page.get_by_role("link", name="Topics", exact=True).click()
+    tree = page.get_by_role("region", name="Topic tree")
+    tree.get_by_role("link", name="Arts", exact=True).click()
+    expect(page.get_by_text("A shared observation.")).to_be_visible()
+    page.get_by_role("link", name="Direct assignments only").click()
+    expect(page.get_by_text("A shared observation.")).to_have_count(0)
+    expect(tree.get_by_role("link", name="Arts › History")).to_be_visible()
+    page.get_by_role("link", name="Include descendants").click()
+    expect(page.get_by_text("A shared observation.")).to_be_visible()
+    page.get_by_role("link", name="Ways of Seeing", exact=True).click()
+    expect(page).to_have_url(book_url)
+
+    page.get_by_label("Note order").select_option(label="Group by Topic")
+    page.get_by_role("button", name="Apply order").click()
+    arts_group = page.get_by_role("region", name="Arts › History")
+    science_group = page.get_by_role("region", name="Science")
+    expect(arts_group.get_by_text("A shared observation.")).to_be_visible()
+    expect(science_group.get_by_text("A shared observation.")).to_be_visible()
+    arts_group.get_by_role("link", name="Open note").click()
+    page.get_by_role("link", name="Edit note", exact=True).click()
+    page.get_by_label("Your note").fill("A revised observation.")
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    page.goto(book_url + "?order=topic")
+    expect(arts_group.get_by_text("A revised observation.")).to_be_visible()
+    expect(science_group.get_by_text("A revised observation.")).to_be_visible()

@@ -1,4 +1,5 @@
 import json
+from collections.abc import Sequence
 from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
@@ -177,19 +178,21 @@ def index(request: HttpRequest) -> HttpResponse:
 def book_detail(request: HttpRequest, book_id: UUID) -> HttpResponse:
     collection = collections.for_owner(request.user)
     book = reading.book(collection, book_id)
+    page = request.GET.get("page", "1")
+    order = request.GET.get("order", "oldest")
+    browsing: dict[str, object] = (
+        {"grouped": reading.book_note_groups(collection, book_id, page)}
+        if order == "topic"
+        else {"notes": reading.book_notes(collection, book_id, page, order)}
+    )
     return render(
         request,
         "alcove/book.html",
         {
             "book": book,
             "chapters": reading.book_chapters(collection, book_id),
-            "notes": reading.book_notes(
-                collection,
-                book_id,
-                request.GET.get("page", "1"),
-                request.GET.get("order", "oldest"),
-            ),
-            "order": request.GET.get("order", "oldest"),
+            "order": order,
+            **browsing,
         },
     )
 
@@ -241,16 +244,44 @@ def topic_tree(request: HttpRequest) -> HttpResponse:
                     form.add_error(field, message)
         else:
             return redirect("topic-tree")
+    return render(
+        request,
+        "alcove/topic_tree.html",
+        {"rows": topic_rows(entries), "form": form},
+        status=400 if form.is_bound else 200,
+    )
+
+
+def topic_rows(
+    entries: Sequence[topics.TopicPath],
+) -> list[tuple[topics.TopicPath, bool, range]]:
     rows = []
     for entry, following in zip(entries, [*entries[1:], None]):
         depth = len(entry.ancestors)
         next_depth = len(following.ancestors) if following else 0
         rows.append((entry, next_depth > depth, range(depth - next_depth)))
+    return rows
+
+
+@login_required
+@require_GET
+def topic_detail(request: HttpRequest, topic_id: UUID) -> HttpResponse:
+    mode = request.GET.get("mode", "branch")
+    result = reading.topic_notes(
+        collections.for_owner(request.user),
+        topic_id,
+        request.GET.get("page", "1"),
+        mode,
+    )
     return render(
         request,
-        "alcove/topic_tree.html",
-        {"rows": rows, "form": form},
-        status=400 if form.is_bound else 200,
+        "alcove/topic.html",
+        {
+            "topic": result.topic,
+            "rows": topic_rows(result.tree),
+            "notes": result.notes,
+            "mode": mode,
+        },
     )
 
 

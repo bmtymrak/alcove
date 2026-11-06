@@ -2,15 +2,7 @@
 {% block title %}Topics · Alcove{% endblock %}
 {% block content %}
 <h1>Topics</h1>
-<section class="panel" aria-label="Topic tree">
-  <ul>
-    {% for entry, has_children, close_levels in rows %}
-    <li>{{ entry.full_path }} <a href="{% url 'topic-rename' entry.id %}" aria-label="Rename {{ entry.full_path }}">Rename</a>
-      {% if has_children %}<ul>{% else %}</li>{% endif %}
-      {% for level in close_levels %}</ul></li>{% endfor %}
-    {% empty %}<li>No Topics yet.</li>{% endfor %}
-  </ul>
-</section>
+{% include "alcove/topic_navigation.html" with manage=True %}
 <form class="panel" method="post">
   <h2>Create a Topic</h2>
   {% csrf_token %}

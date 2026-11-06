@@ -346,6 +346,53 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: Send application/json.
+  /api/v1/books/{book_id}/note-groups/:
+    get:
+      operationId: books_note_groups
+      parameters:
+      - in: path
+        name: book_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page; 20 Note appearances. Groups follow case-insensitive
+          full Topic paths with Unassigned last. Notes within each group follow capture
+          time then UUID. A group may continue on another page. Count includes each
+          appearance.
+      tags:
+      - books
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookNoteGroupPage'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
   /api/v1/books/{book_id}/notes/:
     get:
       operationId: books_notes
@@ -797,6 +844,59 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: Send application/json.
+  /api/v1/topics/{topic_id}/notes/:
+    get:
+      operationId: topics_notes
+      parameters:
+      - in: query
+        name: mode
+        schema:
+          type: string
+          enum:
+          - branch
+          - direct
+        description: Default branch includes descendants. Direct requires an explicit
+          assignment to this Topic.
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: 1-based page; 20 unique Notes in capture order.
+      - in: path
+        name: topic_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - topics
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotePage'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
 components:
   schemas:
     ActionEnum:
@@ -843,6 +943,40 @@ components:
         author:
           type: string
           maxLength: 300
+    BookNoteGroup:
+      type: object
+      properties:
+        topic:
+          oneOf:
+          - $ref: '#/components/schemas/Topic'
+          - type: 'null'
+        notes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Note'
+      required:
+      - notes
+      - topic
+    BookNoteGroupPage:
+      type: object
+      properties:
+        count:
+          type: integer
+          minimum: 0
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookNoteGroup'
+      required:
+      - count
+      - page
+      - page_size
+      - results
     BookPage:
       type: object
       properties:

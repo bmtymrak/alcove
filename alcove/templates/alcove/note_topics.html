@@ -1,5 +1,5 @@
 {% if note.topics %}
 <ul class="metadata" aria-label="Assigned Topics">
-  {% for topic in note.topics %}<li>{{ topic.full_path }}</li>{% endfor %}
+  {% for topic in note.topics %}<li><a href="{% url 'topic' topic.id %}">{{ topic.full_path }}</a></li>{% endfor %}
 </ul>
 {% endif %}

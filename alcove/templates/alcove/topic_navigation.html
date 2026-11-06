@@ -1,0 +1,10 @@
+<section class="panel topic-tree" aria-label="Topic tree">
+  <ul>
+    {% for entry, has_children, close_levels in rows %}
+    <li><a href="{% url 'topic' entry.id %}"{% if entry.id == current.id %} aria-current="location"{% endif %}>{{ entry.full_path }}</a>
+      {% if manage %}<a href="{% url 'topic-rename' entry.id %}" aria-label="Rename {{ entry.full_path }}">Rename</a>{% endif %}
+      {% if has_children %}<ul>{% else %}</li>{% endif %}
+      {% for level in close_levels %}</ul></li>{% endfor %}
+    {% empty %}<li>No Topics yet.</li>{% endfor %}
+  </ul>
+</section>

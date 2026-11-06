@@ -14,9 +14,20 @@
     <option value="newest"{% if order == 'newest' %} selected{% endif %}>Newest first</option>
     <option value="page"{% if order == 'page' %} selected{% endif %}>Page number</option>
     <option value="chapter"{% if order == 'chapter' %} selected{% endif %}>Chapter and page</option>
+    <option value="topic"{% if order == 'topic' %} selected{% endif %}>Group by Topic</option>
   </select>
   <button>Apply order</button>
 </form>
-{% include "alcove/note_list.html" %}
+{% if grouped %}
+  {% for group in grouped.groups %}
+  <section aria-labelledby="group-{{ forloop.counter }}">
+    <h2 id="group-{{ forloop.counter }}">{% if group.topic %}{{ group.topic.full_path }}{% else %}Unassigned{% endif %}</h2>
+    {% for note in group.notes %}{% include "alcove/note_card.html" %}{% endfor %}
+  </section>
+  {% empty %}<p>No notes yet. Start with a thought from your reading.</p>{% endfor %}
+  {% include "alcove/note_pages.html" with note_page=grouped.page %}
+{% else %}
+  {% include "alcove/note_list.html" %}
+{% endif %}
 <script src="{% static 'alcove/chapters.js' %}" defer></script>
 {% endblock %}

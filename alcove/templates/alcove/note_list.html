@@ -1,13 +1,6 @@
-{% load note_content %}
-{% for note in notes %}<article class="panel">
-<div class="note-content">{{ note.content|render_note }}</div>
-{% include "alcove/note_source.html" %}
-{% include "alcove/note_topics.html" %}
-<a href="{% url 'note' note.id %}">Open note <span class="metadata">· {{ note.captured_at|date:"M j, Y, H:i" }} UTC</span></a>
-</article>
-{% empty %}<p>No notes yet. Start with a thought from your reading.</p>{% endfor %}
-<nav aria-label="Note pages">
-{% if notes.has_previous %}<a href="?{% if order %}order={{ order }}&amp;{% endif %}page={{ notes.previous_page_number }}">Previous</a>{% endif %}
-<span>Page {{ notes.number }} of {{ notes.paginator.num_pages }}</span>
-{% if notes.has_next %}<a href="?{% if order %}order={{ order }}&amp;{% endif %}page={{ notes.next_page_number }}">Next</a>{% endif %}
-</nav>
+{% for note in notes %}
+  {% include "alcove/note_card.html" %}
+{% empty %}
+  <p>{{ empty_message|default:"No notes yet. Start with a thought from your reading." }}</p>
+{% endfor %}
+{% include "alcove/note_pages.html" with note_page=notes %}

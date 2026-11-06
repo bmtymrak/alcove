@@ -155,6 +155,18 @@ class NotePageSerializer(serializers.Serializer):
     results = NoteSerializer(many=True)
 
 
+class BookNoteGroupSerializer(serializers.Serializer):
+    topic = TopicSerializer(allow_null=True)
+    notes = NoteSerializer(many=True)
+
+
+class BookNoteGroupPageSerializer(serializers.Serializer):
+    count = serializers.IntegerField(source="page.paginator.count", min_value=0)
+    page = serializers.IntegerField(source="page.number", min_value=1)
+    page_size = serializers.IntegerField(source="page.paginator.per_page")
+    results = BookNoteGroupSerializer(source="groups", many=True)
+
+
 class ErrorDetailSerializer(serializers.Serializer):
     code = serializers.CharField()
     message = serializers.CharField()

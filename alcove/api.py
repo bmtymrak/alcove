@@ -14,6 +14,7 @@ from . import books, chapters, collections, notes, reading, topics
 from .serializers import (
     BookCreateSerializer,
     BookEditSerializer,
+    BookNoteGroupPageSerializer,
     BookPageSerializer,
     BookSerializer,
     CaptureSerializer,
@@ -276,6 +277,34 @@ class BookNotesView(APIView):
         return page_response(page, NoteSerializer)
 
 
+class BookNoteGroupsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="books_note_groups",
+        parameters=[
+            OpenApiParameter(
+                "page",
+                int,
+                description=(
+                    "1-based page; 20 Note appearances. Groups follow case-insensitive "
+                    "full Topic paths with Unassigned last. Notes within each group "
+                    "follow capture time then UUID. A group may continue on another "
+                    "page. Count includes each appearance."
+                ),
+            )
+        ],
+        responses={200: BookNoteGroupPageSerializer, **ERRORS},
+    )
+    def get(self, request: Request, book_id: UUID) -> Response:
+        result = reading.book_note_groups(
+            collections.for_owner(request.user),
+            book_id,
+            request.query_params.get("page", "1"),
+        )
+        return Response(BookNoteGroupPageSerializer(result).data)
+
+
 class TopicsView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -306,6 +335,37 @@ class TopicsView(APIView):
             status=201,
             headers={"Location": reverse("api-topic", kwargs={"topic_id": topic.id})},
         )
+
+
+class TopicNotesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="topics_notes",
+        parameters=[
+            OpenApiParameter(
+                "page",
+                int,
+                description="1-based page; 20 unique Notes in capture order.",
+            ),
+            OpenApiParameter(
+                "mode",
+                str,
+                enum=list(reading.TOPIC_MODES),
+                description="Default branch includes descendants. Direct requires an "
+                "explicit assignment to this Topic.",
+            ),
+        ],
+        responses={200: NotePageSerializer, **ERRORS},
+    )
+    def get(self, request: Request, topic_id: UUID) -> Response:
+        result = reading.topic_notes(
+            collections.for_owner(request.user),
+            topic_id,
+            request.query_params.get("page", "1"),
+            request.query_params.get("mode", "branch"),
+        )
+        return page_response(result.notes, NoteSerializer)
 
 
 class TopicView(APIView):

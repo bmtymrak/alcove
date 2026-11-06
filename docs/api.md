@@ -23,9 +23,11 @@ checks schema drift and validates real request/response examples against it.
 | Append a Chapter | `POST /api/v1/books/{book_id}/chapters/` | `201` |
 | Rename or move a Chapter | `PATCH /api/v1/books/{book_id}/chapters/{chapter_id}/` | `200` |
 | Read a Book's Notes | `GET /api/v1/books/{uuid}/notes/?order=oldest&page=1` | `200` |
+| Read a Book's Notes grouped by Topic | `GET /api/v1/books/{uuid}/note-groups/?page=1` | `200` |
 | List Topics or autocomplete | `GET /api/v1/topics/?q=history` | `200`, an ordered array |
 | Create a root or child Topic | `POST /api/v1/topics/` | `201`, with a relative `Location` header |
 | Read a Topic | `GET /api/v1/topics/{uuid}/` | `200` |
+| Read a Topic's Notes | `GET /api/v1/topics/{uuid}/notes/?mode=branch&page=1` | `200` |
 | Rename a Topic | `PATCH /api/v1/topics/{uuid}/` | `200` |
 | List Notes | `GET /api/v1/notes/?page=1` | `200` |
 | Capture a Note | `POST /api/v1/notes/` | `201` on creation or `200` on replay, both with a relative `Location` header |
@@ -230,8 +232,28 @@ by the Book's explicit Chapter positions with unassigned Notes last. Within
 each Chapter and among unassigned Notes, it uses the same numeric page ordering.
 Both modes break ties by oldest capture first, then ascending UUID.
 Invalid ordering returns `404`. HTML Book pages use
-the same ordering and pagination and retain the selected
-order across pages. No search or general Note filters are supported yet.
+the same ordering and pagination and retain the selected order across pages.
+
+Topic Notes use the same pagination envelope. The default `mode=branch`
+includes Notes explicitly assigned to the selected Topic or any descendant.
+`mode=direct` includes only Notes explicitly assigned to the selected Topic.
+Results span Books and standalone Notes and contain each matching Note once
+in capture order (oldest first, then UUID). The `topics` field lists actual
+assignments, and browsing never writes an assignment. An unknown mode returns
+`404`. The HTML Topic view at `/topics/{uuid}/` keeps the mode across pages.
+
+Book Note groups use the same envelope with `results` containing objects
+with a `topic` (the Topic representation or null for Unassigned) and `notes`
+(an array of Note representations). Groups sort alphabetically by full
+Topic path, case-insensitively, then by Topic UUID, with Unassigned last.
+Within each group Notes sort by capture time, oldest first, then UUID.
+Pagination takes 20 Note appearances from this order before assembling the
+page's groups. A group can continue on the next page, and `count` counts
+appearances. A Note with multiple assignments has the same Note UUID and
+revision in every group. Edit it using the regular Note endpoint. The HTML
+Book view offers the same grouping with `?order=topic`.
+
+No search or general Note filters are supported yet.
 
 ## Errors and safe retries
 
@@ -245,7 +267,7 @@ Errors use the following envelope (field values may be nested for document error
 | --- | --- |
 | `400` | Invalid/missing/unknown fields (`invalid`) or malformed JSON (`parse_error`). |
 | `403` | Sign-in required (`not_authenticated`) or failed CSRF (`permission_denied`). |
-| `404` | Book, Chapter, Note, Topic, order, or page not found at the requested route (`not_found`). |
+| `404` | Book, Chapter, Note, Topic, order, mode, or page not found at the requested route (`not_found`). |
 | `405` | Unsupported method (`method_not_allowed`). |
 | `409` | Stale edit revision (`conflict`) or capture UUID reused for different input (`capture_conflict`). |
 | `415` | Unsupported request media type (`unsupported_media_type`). |

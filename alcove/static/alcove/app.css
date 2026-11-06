@@ -41,5 +41,6 @@ button:disabled { opacity: 0.55; cursor: default; }
 .tiptap p { margin: 0.6rem 0; }
 blockquote { border-left: 3px solid #7a8978; margin: 1rem 0; padding-left: 1rem; }
 ul, ol { padding-left: 1.7rem; }
+.topic-tree ul ul ul { padding-inline-start: 0; }
 dialog { max-width: min(32rem, calc(100% - 2rem)); border: 1px solid #7a8978; border-radius: 0.65rem; color: inherit; }
 dialog::backdrop { background: #26362d66; }
