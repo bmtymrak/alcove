@@ -1072,3 +1072,65 @@ def test_remove_book_keeps_saved_notes_and_recovers_its_capture_draft(
     page.get_by_role("button", name="Save and add another").click()
     expect(page).to_have_url(live_server.url + "/notes/new/")
     expect(editor).to_have_text("")
+
+
+def test_search_notes_from_a_book_and_refine_results_on_a_phone(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(live_server.url + "/login/")
+    page.get_by_label("Username").fill("reader")
+    page.get_by_label("Password").fill(PASSWORD)
+    page.get_by_role("button", name="Sign in", exact=True).click()
+    token = next(c["value"] for c in page.context.cookies() if c["name"] == "csrftoken")
+
+    def create(path, **fields):
+        response = page.request.post(
+            live_server.url + "/api/v1/" + path,
+            data=fields,
+            headers={"X-CSRFToken": token},
+        )
+        assert response.status == 201
+        return response.json()["id"]
+
+    book = create("books/", title="Ways of Seeing")
+    parent = create("topics/", label="Arts")
+    child = create("topics/", label="Painting", parent=parent)
+    direct = "Observation in the gallery."
+    descendant = "Observation in the studio."
+    standalone = "Observation from a walk."
+    for text, source, topic in (
+        (direct, book, parent),
+        (descendant, book, child),
+        (standalone, None, parent),
+    ):
+        create(
+            "notes/",
+            content=document(text),
+            book=source,
+            topic_changes=[{"action": "assign", "topic": topic}],
+        )
+    create("notes/", content=document("A different thought."), book=book)
+
+    page.goto(live_server.url + f"/books/{book}/")
+    expect(page.get_by_role("link", name="Topics", exact=True)).to_be_visible()
+    page.get_by_role("link", name="Search notes", exact=True).click()
+    query = page.get_by_role("searchbox", name="Search Notes")
+    submit = page.get_by_role("button", name="Search", exact=True)
+    query.fill("observation")
+    submit.click()
+    expect(page.get_by_text("3 matching Notes.")).to_be_visible()
+    expect(page.get_by_text("A different thought.", exact=True)).to_have_count(0)
+
+    page.get_by_label("Book", exact=True).select_option(label="Ways of Seeing")
+    page.get_by_label("Topic", exact=True).select_option(label="Arts")
+    submit.click()
+    expect(page.get_by_text("2 matching Notes.")).to_be_visible()
+    expect(page.get_by_text(descendant, exact=True)).to_be_visible()
+    expect(page.get_by_text(standalone, exact=True)).to_have_count(0)
+
+    page.get_by_label("Topic membership").select_option("direct")
+    submit.click()
+    expect(page.get_by_text("1 matching Note.")).to_be_visible()
+    expect(page.get_by_text(descendant, exact=True)).to_have_count(0)
+    expect(query).to_have_value("observation")
+    page.get_by_role("link", name="Open note").click()
+    expect(page.get_by_text(direct, exact=True)).to_be_visible()

@@ -38,7 +38,7 @@ checks schema drift and validates real request/response examples against it.
 | Move a Topic | `POST /api/v1/topics/{uuid}/move/` | `200`, with the updated Topic |
 | Preview a Topic removal | `POST /api/v1/topics/{uuid}/remove/preview/` | `200`, with a confirmation token |
 | Remove a Topic | `POST /api/v1/topics/{uuid}/remove/` | `204` |
-| List active Notes | `GET /api/v1/notes/?page=1` | `200` |
+| List or search active Notes | `GET /api/v1/notes/?q=essay&page=1` | `200` |
 | Capture a Note | `POST /api/v1/notes/` | `201` on creation or `200` on replay, both with a relative `Location` header |
 | Read a Note | `GET /api/v1/notes/{uuid}/` | `200` |
 | Edit a Note (including autosave) | `PATCH /api/v1/notes/{uuid}/` | `200` |
@@ -50,6 +50,26 @@ checks schema drift and validates real request/response examples against it.
 | List a Note's related Notes | `GET /api/v1/notes/{note_id}/links/?page=1` | `200` |
 | Link two Notes | `POST /api/v1/notes/{note_id}/links/` | `201` |
 | Remove a Note Link | `DELETE /api/v1/notes/{note_id}/links/{related_note_id}/` | `204` |
+
+## Search active Notes
+
+The Notes list accepts the same parameters as the browser's `/notes/` page.
+All parameters are optional and can be combined.
+
+| Parameter | Behavior |
+| --- | --- |
+| `q` | Match all supplied words across readable Note text, the source Book title, and directly assigned Topic labels. Matching is case-insensitive and ignores Latin accents. Punctuation separates words. Quotes, wildcards, and Boolean operators have no special meaning. An empty query lists active Notes, and a punctuation-only query finds no Notes. |
+| `book` | Restrict results to the source Book UUID. |
+| `topic` | Restrict results to a Topic UUID. |
+| `mode` | With a Topic, `branch` (default) includes descendant assignments and `direct` requires an explicit assignment to the selected Topic. |
+| `page` | 1-based page, with 20 unique Notes per page. Results are oldest first by capture timestamp, with the Note UUID breaking ties. |
+
+Results use the existing `count`, `page`, `page_size`, and `results` envelope.
+Unknown or malformed filter UUIDs, Books or Topics outside the signed-in
+Collection, invalid modes, and unavailable pages return `404`. Trashed Notes
+stay out of search until restored.
+
+## Books, Chapters, and capture
 
 A Book needs only `{"title": "Ways of Seeing"}`. An optional `author` defaults to
 an empty string. Metadata is trimmed and limited to 300 characters per field;

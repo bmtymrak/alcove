@@ -71,6 +71,8 @@ username preserves the password and Collection.
 ```sh
 docker compose config --quiet
 docker compose build --pull app
+docker compose run --rm --no-deps app python -c \
+  'import sqlite3; sqlite3.connect(":memory:").execute("CREATE VIRTUAL TABLE probe USING fts5(text)"); print(sqlite3.sqlite_version, "FTS5 available")'
 docker compose up -d --wait app
 docker compose exec app python manage.py provision_owner reader
 curl -fsS http://127.0.0.1:8000/healthz
@@ -83,6 +85,19 @@ data and needs no session. Use `docker compose ps` and
 `docker compose logs --tail=100 app` to diagnose startup or health failures.
 To change the owner's password, run
 `docker compose exec app python manage.py changepassword reader`.
+
+## Rebuild Note search
+
+The search migration requires SQLite with FTS5 and indexes existing active Notes.
+The database keeps the index current in the same transactions as Note, Book, and
+Topic changes. This command regenerates the index from saved Notes and their
+current Books and Topic Assignments.
+
+```sh
+docker compose exec app python manage.py rebuild_note_search
+```
+
+The rebuild is atomic and holds a SQLite write lock until it finishes.
 
 ## Back up the database
 

@@ -504,10 +504,38 @@ paths:
       operationId: notes_list
       parameters:
       - in: query
+        name: book
+        schema:
+          type: string
+          format: uuid
+        description: Source Book UUID.
+      - in: query
+        name: mode
+        schema:
+          type: string
+          enum:
+          - branch
+          - direct
+          default: branch
+        description: Branch includes descendants. Direct requires an explicit assignment
+          to the selected Topic. Applies when topic is supplied.
+      - in: query
         name: page
         schema:
           type: integer
-        description: 1-based page; 20 Notes.
+        description: 1-based page; 20 Notes in capture order.
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: All words must match across readable Note text, the Book title,
+          and directly assigned Topic labels. Search syntax is ignored.
+      - in: query
+        name: topic
+        schema:
+          type: string
+          format: uuid
+        description: Topic UUID.
       tags:
       - notes
       security:

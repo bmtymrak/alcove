@@ -1,5 +1,5 @@
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import groupby
 from uuid import UUID
@@ -18,7 +18,7 @@ from django.db.models import (
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 
-from . import topics
+from . import note_search, topics
 from .models import Book, Chapter, Collection, Note, NoteLink, Topic, TopicAssignment
 
 PAGE_SIZE = 20
@@ -54,9 +54,53 @@ def _note_page(
     return result
 
 
+def _filter_id(value: str, name: str) -> UUID | None:
+    if not value:
+        return None
+    try:
+        identifier = UUID(value)
+    except ValueError as exc:
+        raise Http404(f"{name} not found.") from exc
+    if str(identifier) != value.lower():
+        raise Http404(f"{name} not found.")
+    return identifier
+
+
+@dataclass(frozen=True)
+class NoteFilters:
+    query: str
+    book: UUID | None
+    topic: UUID | None
+    mode: str
+
+    @classmethod
+    def from_params(cls, params: Mapping[str, str]) -> "NoteFilters":
+        return cls(
+            params.get("q", "").strip(),
+            _filter_id(params.get("book", ""), "Book"),
+            _filter_id(params.get("topic", ""), "Topic"),
+            params.get("mode", "branch"),
+        )
+
+
 @transaction.atomic
-def notes(collection: Collection, page: int | str = 1) -> Page[Note]:
-    return _note_page(collection, active_notes(collection), page)
+def notes(
+    collection: Collection, filters: NoteFilters, page: int | str = 1
+) -> Page[Note]:
+    if filters.mode not in TOPIC_MODES:
+        raise Http404("Mode not found.")
+    results = active_notes(collection)
+    if filters.book is not None:
+        book(collection, filters.book)
+        results = results.filter(book_id=filters.book)
+    entries = None
+    if filters.topic is not None:
+        entries = topics.tree(collection)
+        _, membership = _topic_membership(entries, filters.topic, filters.mode)
+        results = results.filter(membership)
+    return _note_page(
+        collection, note_search.matching_notes(results, filters.query), page, entries
+    )
 
 
 @transaction.atomic
@@ -244,6 +288,14 @@ def topic_notes(
     if mode not in TOPIC_MODES:
         raise Http404("Mode not found.")
     entries = topics.tree(collection)
+    selected, membership = _topic_membership(entries, topic_id, mode)
+    results = active_notes(collection).filter(membership)
+    return TopicNotes(selected, entries, _note_page(collection, results, page, entries))
+
+
+def _topic_membership(
+    entries: Sequence[topics.TopicPath], topic_id: UUID, mode: str
+) -> tuple[topics.TopicPath, Exists]:
     selected = next((entry for entry in entries if entry.id == topic_id), None)
     if selected is None:
         raise Http404("Topic not found.")
@@ -253,8 +305,7 @@ def topic_notes(
     assignments = TopicAssignment.objects.filter(
         note_id=OuterRef("pk"), topic_id__in=topic_ids
     )
-    results = active_notes(collection).filter(Exists(assignments))
-    return TopicNotes(selected, entries, _note_page(collection, results, page, entries))
+    return selected, Exists(assignments)
 
 
 @transaction.atomic

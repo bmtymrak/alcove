@@ -81,13 +81,32 @@ class NotesView(APIView):
     @extend_schema(
         operation_id="notes_list",
         parameters=[
-            OpenApiParameter("page", int, description="1-based page; 20 Notes.")
+            OpenApiParameter(
+                "page", int, description="1-based page; 20 Notes in capture order."
+            ),
+            OpenApiParameter(
+                "q",
+                str,
+                description="All words must match across readable Note text, the Book "
+                "title, and directly assigned Topic labels. Search syntax is ignored.",
+            ),
+            OpenApiParameter("book", UUID, description="Source Book UUID."),
+            OpenApiParameter("topic", UUID, description="Topic UUID."),
+            OpenApiParameter(
+                "mode",
+                str,
+                enum=list(reading.TOPIC_MODES),
+                default="branch",
+                description="Branch includes descendants. Direct requires an explicit "
+                "assignment to the selected Topic. Applies when topic is supplied.",
+            ),
         ],
         responses={200: NotePageSerializer, **ERRORS},
     )
     def get(self, request: Request) -> Response:
         page = reading.notes(
             collections.for_owner(request.user),
+            reading.NoteFilters.from_params(request.query_params),
             request.query_params.get("page", "1"),
         )
         return page_response(page, NoteSerializer)

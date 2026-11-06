@@ -62,11 +62,15 @@ def draft_scope(request: HttpRequest, collection: Collection) -> str:
 @require_GET
 def note_list(request: HttpRequest) -> HttpResponse:
     collection = collections.for_owner(request.user)
+    filters = reading.NoteFilters.from_params(request.GET)
     return render(
         request,
         "alcove/index.html",
         {
-            "notes": reading.notes(collection, request.GET.get("page", "1")),
+            "notes": reading.notes(collection, filters, request.GET.get("page", "1")),
+            "filters": filters,
+            "book_options": reading.book_options(collection),
+            "topic_options": topics.tree(collection),
         },
     )
 

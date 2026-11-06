@@ -123,8 +123,10 @@ the Note with its surviving source, Topics, and Note Links, or confirm permanent
 deletion. On a Book page, **Remove book** removes the Book and its Chapters
 and keeps its active and trashed Notes with their remaining associations.
 General capture offers drafts from removed Books in the same tab and session.
-Trash has no expiry. Collection-wide search and portability are
-planned separately.
+Trash has no expiry. Open **Search notes** from the navigation to search active
+Notes by readable text, Book title, or Topic label. Combine Book and Topic
+filters, with the option to include descendants or require a direct assignment.
+Collection portability is planned separately.
 
 ## Editor assets
 

@@ -1,7 +1,42 @@
 {% extends "alcove/base.html" %}
+{% block title %}Notes · Alcove{% endblock %}
 {% block content %}
 <p class="eyebrow">YOUR PRIVATE COLLECTION</p>
 <h1>Notes</h1>
 <a class="button" href="{% url 'capture' %}">Capture a note</a>
+<form class="panel" method="get" role="search" aria-label="Note search">
+  <label for="note-query">Search Notes</label>
+  <input id="note-query" type="search" name="q" value="{{ filters.query }}" placeholder="Note text, Book title, or Topic label">
+  <label for="search-book">Book</label>
+  <select id="search-book" name="book">
+    <option value="">All Books</option>
+    {% for id, label in book_options %}
+    <option value="{{ id }}"{% if id == filters.book|stringformat:"s" %} selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <label for="search-topic">Topic</label>
+  <select id="search-topic" name="topic">
+    <option value="">All Topics</option>
+    {% for topic in topic_options %}
+    <option value="{{ topic.id }}"{% if topic.id == filters.topic %} selected{% endif %}>{{ topic.full_path }}</option>
+    {% endfor %}
+  </select>
+  <label for="search-mode">Topic membership</label>
+  <select id="search-mode" name="mode">
+    <option value="branch"{% if filters.mode == 'branch' %} selected{% endif %}>Include descendants</option>
+    <option value="direct"{% if filters.mode == 'direct' %} selected{% endif %}>Direct assignments only</option>
+  </select>
+  <div class="actions">
+    <button type="submit">Search</button>
+    {% if filters.query or filters.book or filters.topic or filters.mode != 'branch' %}
+    <a href="{% url 'notes' %}">Clear search and filters</a>
+    {% endif %}
+  </div>
+</form>
+{% if filters.query or filters.book or filters.topic %}
+<p>{{ notes.paginator.count }} matching Note{{ notes.paginator.count|pluralize }}.</p>
+{% include "alcove/note_list.html" with empty_message="No Notes match your search and filters." %}
+{% else %}
 {% include "alcove/note_list.html" %}
+{% endif %}
 {% endblock %}
