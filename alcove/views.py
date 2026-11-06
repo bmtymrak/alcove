@@ -103,6 +103,7 @@ def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
         {
             "form": form,
             "note": note,
+            "save_conflict": status == 409,
         },
         status=status,
     )

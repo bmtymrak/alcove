@@ -15,6 +15,107 @@ def page(live_server, owner):
                 yield context.new_page()
 
 
+def open_existing_editor(page, live_server):
+    page.goto(live_server.url + "/login/")
+    page.get_by_label("Username").fill("reader")
+    page.get_by_label("Password").fill(PASSWORD)
+    page.get_by_role("button", name="Sign in", exact=True).click()
+    page.get_by_role("link", name="Capture a note", exact=True).click()
+    page.get_by_label("Your note").fill("Original thought.")
+    page.get_by_role("button", name="Save note", exact=True).click()
+    page.get_by_role("link", name="Edit note", exact=True).click()
+
+
+def test_existing_note_autosaves_without_leaving_the_editor(page, live_server, owner):
+    open_existing_editor(page, live_server)
+    edit_url = page.url
+    page.get_by_label("Your note").fill("A thought reconsidered.")
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    expect(page).to_have_url(edit_url)
+    assert page.get_by_role("button", name="Save changes", exact=True).count() == 0
+    page.reload()
+    expect(page.get_by_label("Your note")).to_have_text("A thought reconsidered.")
+
+
+def test_autosave_keeps_newer_edits_pending_until_their_request_finishes(
+    page, live_server, owner
+):
+    open_existing_editor(page, live_server)
+    requests = []
+    page.route("**/api/v1/notes/*/", lambda route: requests.append(route))
+    editor = page.get_by_label("Your note")
+    editor.fill("First pending version.")
+    expect(page.get_by_role("status")).to_have_text("Saving…")
+    page.wait_for_timeout(700)
+    assert len(requests) == 1
+    editor.fill("Latest pending version.")
+    page.wait_for_timeout(700)
+    assert len(requests) == 1
+    requests[0].continue_()
+    page.wait_for_timeout(700)
+    assert len(requests) == 2
+    assert requests[1].request.post_data_json["revision"] == 2
+    expect(page.get_by_role("status")).to_have_text("Saving…")
+    expect(editor).to_have_text("Latest pending version.")
+    requests[1].continue_()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    page.reload()
+    expect(editor).to_have_text("Latest pending version.")
+
+
+@pytest.mark.parametrize(
+    "failure", ["validation", "server", "lost-response", "lost-response-revert"]
+)
+def test_failed_autosave_retains_pending_edits_and_can_retry_or_review(
+    page, live_server, owner, failure
+):
+    open_existing_editor(page, live_server)
+    endpoint = "**/api/v1/notes/*/"
+
+    def fail(route):
+        if failure.startswith("lost-response"):
+            assert route.fetch().status == 200
+            route.abort("failed")
+        elif failure == "server":
+            route.fulfill(status=500, content_type="text/html", body="Unavailable")
+        else:
+            route.fulfill(
+                status=400,
+                json={"error": {"message": "Could not save.", "fields": {}}},
+            )
+
+    page.route(endpoint, fail)
+    editor = page.get_by_label("Your note")
+    editor.fill("Keep this pending thought.")
+    expect(page.get_by_role("status")).to_have_text(
+        "Not saved. Your draft is still here."
+    )
+    expect(editor).to_have_text("Keep this pending thought.")
+    pending = (
+        "Original thought."
+        if failure == "lost-response-revert"
+        else "A revised pending thought."
+    )
+    editor.fill(pending)
+    expect(page.get_by_role("status")).to_have_text(
+        "Not saved. Your draft is still here."
+    )
+    page.unroute(endpoint)
+    page.get_by_role("button", name="Retry saving").click()
+    if failure.startswith("lost-response"):
+        expect(page.get_by_role("status")).to_have_text(
+            "Conflict. Your draft is still here."
+        )
+        page.get_by_role("button", name="Review current note").click()
+        expect(page.locator("[data-current-content]")).to_have_text(
+            "Keep this pending thought."
+        )
+        page.get_by_role("button", name="Save my version").click()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    page.reload()
+    expect(editor).to_have_text(pending)
+
+
 @pytest.mark.parametrize(
     "viewport", [{"width": 1280, "height": 900}, {"width": 390, "height": 844}]
 )
@@ -37,8 +138,8 @@ def test_capture_read_edit_and_sign_out_in_browser(page, live_server, owner, vie
     expect(page.get_by_text("A sentence from my reading.", exact=True)).to_be_visible()
     page.get_by_role("link", name="Edit note", exact=True).click()
     page.get_by_label("Your note").fill("A thought reconsidered.")
-    page.get_by_role("button", name="Save changes", exact=True).click()
-    expect(page).to_have_url(note_url)
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    page.goto(note_url)
     expect(page.get_by_text("A thought reconsidered.", exact=True)).to_be_visible()
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
     page.get_by_role("button", name="Sign out", exact=True).click()
@@ -64,15 +165,24 @@ def test_browser_retains_invalid_and_conflicted_input(page, live_server, owner):
     second_tab = page.context.new_page()
     second_tab.goto(page.url)
     second_tab.get_by_label("Your note").fill("Saved in another tab.")
-    second_tab.get_by_role("button", name="Save changes", exact=True).click()
+    expect(second_tab.get_by_role("status")).to_have_text("Saved.")
     page.get_by_label("Your note").fill("Keep my pending thought.")
-    page.get_by_role("button", name="Save changes", exact=True).click()
+    expect(page.get_by_role("status")).to_have_text(
+        "Conflict. Your draft is still here."
+    )
     expect(page.get_by_label("Your note")).to_have_text("Keep my pending thought.")
     expect(
         page.get_by_text("This Note changed elsewhere.", exact=False)
     ).to_be_visible()
-    page.get_by_role("link", name="Open current note").click()
+    page.get_by_role("button", name="Review current note").click()
     expect(page.get_by_text("Saved in another tab.", exact=True)).to_be_visible()
+    expect(page.get_by_label("Your note")).to_have_text("Keep my pending thought.")
+    page.get_by_role("button", name="Save my version").click()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    second_tab.reload()
+    expect(second_tab.get_by_label("Your note")).to_have_text(
+        "Keep my pending thought."
+    )
     second_tab.close()
 
 
@@ -122,7 +232,8 @@ def test_book_marginalia_capture_and_inline_reading(page, live_server, owner, vi
     expect(page.get_by_role("link", name="Ways of Seeing", exact=True)).to_be_visible()
     page.get_by_role("link", name="Edit note", exact=True).click()
     page.get_by_label("Source book").select_option("")
-    page.get_by_role("button", name="Save changes", exact=True).click()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    page.goto(page.url.removesuffix("edit/"))
     expect(page.get_by_role("link", name="Edit note", exact=True)).to_be_visible()
     page.goto(book_url)
     expect(page.locator(".note-content")).to_have_text(["First marginalium."])
@@ -183,15 +294,16 @@ def test_formatted_editor_round_trip_and_website_links(
     editor.press_sequentially("An idea")
     editor.press("Enter")
     editor.press_sequentially("Another idea")
-    page.get_by_role("button", name="Save changes", exact=True).click()
-    expect(page).to_have_url(note_url)
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    page.goto(note_url)
     expect(page.locator(".note-content ul li")).to_have_text(
         ["An idea", "Another idea"]
     )
     page.get_by_role("link", name="Edit note", exact=True).click()
     editor.press("ControlOrMeta+End")
     page.get_by_role("button", name="Numbered list", exact=True).click()
-    page.get_by_role("button", name="Save changes", exact=True).click()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    page.goto(note_url)
     expect(page.locator(".note-content ol li")).to_have_text(
         ["An idea", "Another idea"]
     )
@@ -232,15 +344,18 @@ def test_existing_plain_note_gains_formatting_and_keeps_draft_after_network_erro
     page.get_by_role("button", name="Bold", exact=True).click()
     endpoint = f"**/api/v1/notes/{note['id']}/"
     page.route(endpoint, lambda route: route.abort("failed"))
-    page.get_by_role("button", name="Save changes", exact=True).click()
-    expect(page.get_by_role("status")).to_have_text("Save not confirmed.")
+    expect(page.get_by_role("status")).to_have_text(
+        "Not saved. Your draft is still here."
+    )
     expect(editor.locator("strong")).to_have_text("An existing plain Note.")
     assert (
         page.request.get(live_server.url + f"/api/v1/notes/{note['id']}/").json()
         == note
     )
     page.unroute(endpoint)
-    page.get_by_role("button", name="Save changes", exact=True).click()
+    page.get_by_role("button", name="Retry saving").click()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    page.goto(page.url.removesuffix("edit/"))
     expect(page.locator(".note-content strong")).to_have_text("An existing plain Note.")
     updated = page.request.get(live_server.url + f"/api/v1/notes/{note['id']}/").json()
     assert updated["content"]["format"] == "tiptap"
@@ -269,5 +384,6 @@ def test_emphasis_across_a_line_break_round_trips(page, live_server, owner):
     expect(editor.locator("strong")).to_have_text("FirstSecond")
     expect(editor.locator("em")).to_have_text("FirstSecond")
     expect(editor.locator("br")).to_have_count(1)
-    page.get_by_role("button", name="Save changes", exact=True).click()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
+    page.goto(page.url.removesuffix("edit/"))
     expect(page.locator(".note-content br")).to_have_count(1)

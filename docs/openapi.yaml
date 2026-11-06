@@ -426,8 +426,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-          description: Stale revision; no change.
+                $ref: '#/components/schemas/Conflict'
+          description: Stale revision; no change. Review the current Note via GET.
 components:
   schemas:
     Book:
@@ -498,6 +498,33 @@ components:
           format: uuid
       required:
       - content
+    Conflict:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/ConflictDetail'
+      required:
+      - error
+    ConflictDetail:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        fields:
+          type: object
+          additionalProperties: {}
+        current_revision:
+          type: integer
+          minimum: 1
+          description: Saved revision at conflict detection. Fetch and review before
+            retrying.
+      required:
+      - code
+      - current_revision
+      - fields
+      - message
     EditRequest:
       type: object
       properties:
@@ -513,6 +540,8 @@ components:
           maximum: 9223372036854775806
           minimum: 1
           format: int64
+          description: Required last-read revision. A stale value returns 409 without
+            changes.
       required:
       - revision
     Error:
@@ -560,6 +589,7 @@ components:
         revision:
           type: integer
           minimum: 1
+          description: Current saved revision; increases on each successful edit.
       required:
       - book
       - captured_at

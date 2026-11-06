@@ -21,6 +21,7 @@ button.quiet { background: transparent; color: #315c40; }
 .errorlist, .error { color: #9c2828; }
 .note-content { overflow-wrap: anywhere; }
 .note-content p { white-space: pre-wrap; }
+#save-conflict pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .metadata { color: #536549; font-size: 0.85rem; }
 .actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: 1.25rem; }
 @media (max-width: 480px) { header { padding: 1rem; align-items: flex-start; } main { padding: 1.5rem 1rem; } .panel { padding: 1rem; } nav { justify-content: flex-end; gap: 0.5rem; } }

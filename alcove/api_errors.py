@@ -3,19 +3,20 @@ from typing import Any
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
-from .notes import NoteError
+from .notes import NoteConflict, NoteError
 
 
 def exception_handler(exc: Exception, context: dict[str, Any]) -> Response | None:
     if isinstance(exc, NoteError):
+        error: dict[str, Any] = {
+            "code": exc.code,
+            "message": str(exc),
+            "fields": exc.fields,
+        }
+        if isinstance(exc, NoteConflict):
+            error["current_revision"] = exc.current_revision
         return Response(
-            {
-                "error": {
-                    "code": exc.code,
-                    "message": str(exc),
-                    "fields": exc.fields,
-                }
-            },
+            {"error": error},
             status=exc.status,
         )
     response = drf_exception_handler(exc, context)

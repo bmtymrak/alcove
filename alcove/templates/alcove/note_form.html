@@ -6,10 +6,11 @@
 <h1>{% if note %}Edit note{% else %}Capture a note{% endif %}</h1>
 {% if source_book %}<p>Capturing from <a href="{% url 'book' source_book.id %}">{{ source_book.title }}</a></p>{% endif %}
 <p id="content-help">A thought, a quotation, a sentence. No title or book needed.</p>
-<form method="post" class="panel" data-note-editor data-api-url="{% if note %}{% url 'api-note' note.id %}{% else %}{% url 'api-notes' %}{% endif %}" data-rejected="{% if form.document_rejected or form.content_document.errors %}true{% else %}false{% endif %}">
+<form method="post" class="panel" data-note-editor data-save-state="{% if save_conflict %}conflict{% elif form.errors %}failed{% else %}saved{% endif %}" data-api-url="{% if note %}{% url 'api-note' note.id %}{% else %}{% url 'api-notes' %}{% endif %}" data-rejected="{% if form.document_rejected or form.content_document.errors %}true{% else %}false{% endif %}">
   {% csrf_token %}
   {% if form.errors %}<div role="alert">Your note has not been saved. Check the message below.</div>{% endif %}
   {{ form.non_field_errors }}
+  {{ form.revision.errors }}
   {{ form.revision }}
   {{ form.content.errors }}
   <label id="note-content-label" for="note-editor">Your note</label>
@@ -27,6 +28,17 @@
   <div id="editor-host" hidden></div>
   <p id="editor-error" class="error" role="alert" hidden></p>
   <p id="save-status" role="status" aria-live="polite"></p>
+  {% if note %}
+  <button type="button" data-retry-save hidden>Retry saving</button>
+  <button type="button" data-review-conflict hidden>Review current note</button>
+  <section id="save-conflict" aria-label="Review conflict" hidden>
+    <h2>Current saved note</h2>
+    <p>Revision <span data-current-revision></span> · Source: <span data-current-source></span></p>
+    <pre data-current-content></pre>
+    <p>Your pending version remains in the editor above. Reconcile your changes there before saving your version over the reviewed revision.</p>
+    <button type="button" data-resolve-conflict hidden>Save my version</button>
+  </section>
+  {% endif %}
   <noscript><label for="id_content">Plain text</label></noscript>
   {{ form.content }}
   <details id="document-recovery"{% if form.content_document.errors or form.document_rejected %} open{% endif %}>
@@ -38,9 +50,9 @@
   {{ form.book.errors }}
   {{ form.book.label_tag }}{{ form.book }}
   <div class="actions">
-    <button>{% if note %}Save changes{% else %}Save note{% endif %}</button>
+    <button data-explicit-save>{% if note %}Save changes{% else %}Save note{% endif %}</button>
     {% if not note %}<button name="add_another" value="1">Save and add another</button>{% endif %}
-    {% if note %}<a href="{% url 'note' note.id %}">Open current note</a>{% else %}<a href="{% url 'notes' %}">Cancel</a>{% endif %}
+    {% if note %}<a href="{% url 'note' note.id %}" target="_blank" rel="noopener">Open current note</a>{% else %}<a href="{% url 'notes' %}">Cancel</a>{% endif %}
   </div>
 </form>
 <dialog id="link-dialog">

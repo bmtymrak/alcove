@@ -28,11 +28,21 @@ class CaptureSerializer(StrictSerializer):
     book = serializers.UUIDField(required=False, allow_null=True)
 
 
+class RevisionField(serializers.IntegerField):
+    def to_internal_value(self, data: Any) -> int:
+        if type(data) is not int:
+            self.fail("invalid")
+        return super().to_internal_value(data)
+
+
 class EditSerializer(CaptureSerializer):
     content = ContentField(required=False)
-    revision = serializers.IntegerField(
+    revision = RevisionField(
         min_value=1,
         max_value=notes.MAX_EXPECTED_REVISION,
+        help_text=(
+            "Required last-read revision. A stale value returns 409 without changes."
+        ),
     )
 
 
@@ -43,7 +53,10 @@ class NoteSerializer(serializers.Serializer):
     plain_text = serializers.CharField()
     captured_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
-    revision = serializers.IntegerField(min_value=1)
+    revision = serializers.IntegerField(
+        min_value=1,
+        help_text="Current saved revision; increases on each successful edit.",
+    )
 
 
 class NotePageSerializer(serializers.Serializer):
@@ -62,6 +75,19 @@ class ErrorDetailSerializer(serializers.Serializer):
 
 class ErrorSerializer(serializers.Serializer):
     error = ErrorDetailSerializer()
+
+
+class ConflictDetailSerializer(ErrorDetailSerializer):
+    current_revision = serializers.IntegerField(
+        min_value=1,
+        help_text=(
+            "Saved revision at conflict detection. Fetch and review before retrying."
+        ),
+    )
+
+
+class ConflictSerializer(serializers.Serializer):
+    error = ConflictDetailSerializer()
 
 
 class BookCreateSerializer(StrictSerializer):

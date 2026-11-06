@@ -199,6 +199,7 @@ def test_stale_edit_retains_input_and_does_not_overwrite_newer_content(
             },
         )
         assert response.json()["error"]["code"] == "conflict"
+        assert response.json()["error"]["current_revision"] == 2
     assert response.status_code == 409
     assert signed_in.get(path).json() == newer
 

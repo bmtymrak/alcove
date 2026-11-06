@@ -17,6 +17,7 @@ from .serializers import (
     BookPageSerializer,
     BookSerializer,
     CaptureSerializer,
+    ConflictSerializer,
     EditSerializer,
     ErrorSerializer,
     NotePageSerializer,
@@ -97,7 +98,10 @@ class NoteView(APIView):
             200: NoteSerializer,
             **WRITE_ERRORS,
             409: OpenApiResponse(
-                ErrorSerializer, description="Stale revision; no change."
+                ConflictSerializer,
+                description=(
+                    "Stale revision; no change. Review the current Note via GET."
+                ),
             ),
         },
     )

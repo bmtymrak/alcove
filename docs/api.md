@@ -23,7 +23,7 @@ checks schema drift and validates real request/response examples against it.
 | List Notes | `GET /api/v1/notes/?page=1` | `200` |
 | Capture a Note | `POST /api/v1/notes/` | `201`, with a relative `Location` header |
 | Read a Note | `GET /api/v1/notes/{uuid}/` | `200` |
-| Explicitly edit a Note | `PATCH /api/v1/notes/{uuid}/` | `200` |
+| Edit a Note (including autosave) | `PATCH /api/v1/notes/{uuid}/` | `200` |
 
 A Book needs only `{"title": "Ways of Seeing"}`. An optional `author` defaults to
 an empty string. Metadata is trimmed and limited to 300 characters per field;
@@ -61,7 +61,8 @@ increments the revision atomically. There is no caller-supplied ownership field;
 every lookup and change uses the session owner's Collection. Another owner's UUID
 and a nonexistent UUID both return `404`.
 
-Edit revisions must be integers between 1 and 9223372036854775806, leaving room
+Edit revisions must be JSON integers between 1 and 9223372036854775806 (strings,
+booleans, floating-point values, and omitted revisions are rejected), leaving room
 for the increment in SQLite storage. Out-of-range preconditions are field errors
 (`400`) and do not change the Note.
 
@@ -154,8 +155,18 @@ Errors use the following envelope (field values may be nested for document error
 | `409` | Stale revision (`conflict`); content was not changed. |
 | `415` | Unsupported request media type (`unsupported_media_type`). |
 
-Retain pending content after errors. For `409`, fetch the latest Note and let the
-owner reconcile the changes before submitting with its revision. Retrying an edit
+Revision conflicts have this additional required field:
+
+```json
+{"error":{"code":"conflict","message":"This Note changed elsewhere. Your text has not been saved. Review the current Note before trying again.","fields":{},"current_revision":2}}
+```
+
+`current_revision` is the revision at conflict detection, not permission to
+overwrite it. Retain pending content after errors. For `409`, GET the latest Note
+and let the owner review its content and source and reconcile the changes before
+submitting with its revision. A concurrent change after review still returns
+`409`. Every rejected edit leaves content, source, revision, and timestamps intact.
+Retrying an edit
 with an already-consumed revision produces a conflict. Capture idempotency is not
 delivered yet: repeating a successful POST creates another Note, so after an
 ambiguous network result inspect the Collection before resubmitting. Never infer
@@ -180,15 +191,31 @@ Content validation returns `400` with `error.code = "invalid"` and
 An empty document returns `"Write something before saving."`. Invalid content
 never creates a Note or changes existing content, revision, or timestamps.
 
-Enhanced forms send the canonical document through the JSON API with CSRF. They
-keep formatted input on validation, conflict, and network errors, show saving or
-failure status, and navigate only after a confirmed successful response. Saves
-are explicit. Draft recovery across navigation/reload and autosave are not yet
-delivered. Native HTML form posts accept the same document serialized in the
+Enhanced forms send the canonical document through the JSON API with CSRF. Capture
+is explicit and navigates only after a confirmed successful response. Existing-note
+content and source edits autosave after 500 ms of inactivity, serialize requests,
+and remain in the editor. A successful response confirms only the snapshot sent;
+newer edits remain pending until their own save succeeds. Saving, saved, failed,
+and conflict status is visible. Validation, network, and server errors retain
+formatted pending input, pause automatic retries, and offer Retry saving. A lost
+response never implies success, even after undoing the pending edits; retrying
+uses the last confirmed revision and may return a conflict if the write committed.
+
+Conflicts pause autosave. Review current note fetches the current text, source,
+and revision without replacing pending content. The owner can reconcile in the
+editor and explicitly Save my version against the reviewed revision; another
+concurrent edit still conflicts. Open current note opens the formatted saved
+version in another tab. Navigating away with unconfirmed edits triggers the
+browser's unsaved-changes warning. Local draft recovery across navigation/reload
+is not yet delivered.
+
+Native HTML form posts accept the same document serialized in the
 `content_document` field, with the same validation rules; an empty/omitted field
 uses legacy plain text from `content`. Invalid JSON and rejected documents remain
 in the recovery field, escaped, instead of being stripped or replaced. The plain
 text field for an existing formatted Note is read-only without the editor, so a
 source-only edit preserves the canonical document. Authentication redirects and
 HTML form errors are specific to the HTML path; JSON errors use the envelope
-above for matched API operations.
+above for matched API operations. Explicit HTML edits also require the last-read
+`revision` hidden field and return `409` with pending input retained on conflicts;
+they never replace it with the newly read revision automatically.

@@ -29,6 +29,17 @@ class NoteError(Exception):
         self.fields = fields or {}
 
 
+class NoteConflict(NoteError):
+    def __init__(self, current_revision: int) -> None:
+        super().__init__(
+            "This Note changed elsewhere. Your text has not been saved. "
+            "Review the current Note before trying again.",
+            code="conflict",
+            status=409,
+        )
+        self.current_revision = current_revision
+
+
 def plain_text_content(text: str) -> dict[str, Any]:
     return {"version": 1, "format": "plain-text", "text": text}
 
@@ -100,10 +111,5 @@ def edit(
         ).update(**changes)
         note = reading.note(collection, note_id)
         if not changed:
-            raise NoteError(
-                "This Note changed elsewhere. Your text has not been saved. "
-                "Open the current Note before trying again.",
-                code="conflict",
-                status=409,
-            )
+            raise NoteConflict(note.revision)
         return note

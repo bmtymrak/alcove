@@ -2,6 +2,7 @@ import { Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { Link } from '@tiptap/extension-link'
 import { OrderedList } from '@tiptap/extension-list'
+import { autosave } from './autosave'
 
 const form = document.querySelector('[data-note-editor]')
 if (form) initializeEditor(form)
@@ -24,6 +25,7 @@ function initializeEditor(form) {
   const toolbar = document.querySelector('#formatting-tools')
   const host = document.querySelector('#editor-host')
   let editor
+  let changed = () => {}
   try {
     if (form.dataset.rejected === 'true') throw new Error('Rejected document')
     const stored = source.value ? JSON.parse(source.value) : { format: 'plain-text', text: plain.value }
@@ -81,6 +83,7 @@ function initializeEditor(form) {
     if (!editor) return
     source.value = JSON.stringify({ version: 1, format: 'tiptap', doc: editor.getJSON() })
     plain.value = editor.getText({ blockSeparator: '\n' })
+    changed()
   }
   const commands = {
     bold: () => editor.chain().focus().toggleBold().run(),
@@ -128,15 +131,13 @@ function initializeEditor(form) {
     editor.commands.focus()
   })
   let saving = false
-  form.addEventListener('submit', async event => {
+  if (!form.querySelector('[name="revision"]')) form.addEventListener('submit', async event => {
     event.preventDefault()
     if (saving) return
     sync()
-    const revision = form.querySelector('[name="revision"]')
     const payload = {
       content: JSON.parse(source.value),
       book: form.querySelector('[name="book"]').value || null,
-      ...(revision ? { revision: Number(revision.value) } : {}),
     }
     const controls = form.querySelectorAll('button, select')
     const status = document.querySelector('#save-status')
@@ -149,7 +150,7 @@ function initializeEditor(form) {
     message.hidden = true
     try {
       const response = await fetch(form.dataset.apiUrl, {
-        method: revision ? 'PATCH' : 'POST',
+        method: 'POST',
         credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
@@ -187,6 +188,7 @@ function initializeEditor(form) {
   host.hidden = false
   toolbar.hidden = false
   sync()
+  if (form.querySelector('[name="revision"]')) changed = autosave(form)
   updateToolbar()
   editor.commands.focus('end')
 }

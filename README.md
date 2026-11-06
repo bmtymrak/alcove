@@ -58,9 +58,9 @@ apply migrations, and never use the saved Collection. HTTP integration tests rea
 persisted results back through public routes and exercise sessions, CSRF, validation,
 pagination, revision conflicts, and a second owner's private Collection. Browser
 tests run a local Django server and Chromium at desktop and phone sizes; they cover
-capture, repeated Book marginalia capture, inline reading, ordering, reload, explicit
-editing, formatted round trips, website links, retained invalid input and failed
-saves, conflicts, and sign-out.
+capture, repeated Book marginalia capture, inline reading, ordering, reload,
+autosave, formatted round trips, website links, retained invalid input and failed
+saves, delayed and lost responses, two-tab conflicts and resolution, and sign-out.
 For a focused run use `uv run pytest tests/test_notes_http.py` or
 `uv run pytest tests/test_browser.py`. If browser downloads are stored in a custom
 location, set `PLAYWRIGHT_BROWSERS_PATH` for both installation and test runs.
@@ -90,9 +90,20 @@ Notes inline, oldest capture first by default, with a newest-first option; Save
 and add another retains the selected Book. Existing standalone Notes remain
 unassigned after upgrading. Apply the new migrations before starting the server.
 
-Draft recovery across navigation/reload, autosave, retry idempotency, search,
-Topics, Note Links, trash, and portability remain later tickets from Spec #2.
-Explicit saves retain formatted input on validation, conflict, or network errors.
+Existing Notes autosave content and source changes after a short pause, with one
+request at a time and visible saving, saved, failed, and conflict states
+([Ticket #6](https://github.com/bmtymrak/alcove/issues/6)). Editing stays available
+while saving. Failed requests retain pending content and offer Retry saving.
+Conflicts pause saves: Review current note shows the saved text and source without
+replacing the editor, and Save my version applies the owner's reconciled content
+against that reviewed revision. Open current note opens a separate tab for the
+formatted saved version. Navigation warns while edits remain unconfirmed.
+Without JavaScript, Save changes uses the same revision checks through HTML.
+Creation still requires Save note or Save and add another.
+
+Draft recovery across navigation/reload, retry idempotency, search, Topics, Note
+Links, trash, and portability remain later tickets from Spec #2. Pending editor
+content is retained in the open page; it is not an offline or persistent draft.
 
 ## Editor assets
 
