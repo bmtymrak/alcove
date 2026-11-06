@@ -158,8 +158,8 @@ def capture(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse:
             form.add_note_error(exc)
         else:
             if "add_another" in request.POST:
-                if form.cleaned_data["book"]:
-                    return redirect("book-capture", book_id=form.cleaned_data["book"])
+                if note.book_id:
+                    return redirect("book-capture", book_id=note.book_id)
                 return redirect("capture")
             return redirect("note", note_id=note.id)
     return render(
@@ -351,6 +351,20 @@ def book_form(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse
         "alcove/book_form.html",
         {"book": book, "form": form},
         status=400 if form.is_bound else 200,
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def book_remove(request: HttpRequest, book_id: UUID) -> HttpResponse:
+    collection = collections.for_owner(request.user)
+    if request.method == "POST":
+        books.remove(collection, book_id)
+        return redirect("index")
+    return render(
+        request,
+        "alcove/book_remove.html",
+        {"book": reading.book(collection, book_id)},
     )
 
 

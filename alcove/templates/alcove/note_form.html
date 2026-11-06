@@ -6,7 +6,7 @@
 <h1>{% if note %}Edit note{% else %}Capture a note{% endif %}</h1>
 {% if source_book %}<p>Capturing from <a href="{% url 'book' source_book.id %}">{{ source_book.title }}</a></p>{% endif %}
 <p id="content-help">A thought, a quotation, a sentence. No title or book needed.</p>
-<form method="post" class="panel" data-note-editor data-draft-scope="{{ draft_scope }}"{% if form.is_bound %} data-bound{% endif %} data-save-state="{% if save_conflict %}conflict{% elif form.errors %}failed{% else %}saved{% endif %}" data-api-url="{% if note %}{% url 'api-note' note.id %}{% else %}{% url 'api-notes' %}{% endif %}" data-rejected="{% if form.document_rejected or form.content_document.errors %}true{% else %}false{% endif %}">
+<form method="post"{% if source_book %} action="{% url 'capture' %}"{% endif %} class="panel" data-note-editor data-draft-scope="{{ draft_scope }}"{% if form.is_bound %} data-bound{% endif %} data-save-state="{% if save_conflict %}conflict{% elif form.errors %}failed{% else %}saved{% endif %}" data-api-url="{% if note %}{% url 'api-note' note.id %}{% else %}{% url 'api-notes' %}{% endif %}" data-rejected="{% if form.document_rejected or form.content_document.errors %}true{% else %}false{% endif %}">
   {% csrf_token %}
   {% if form.errors %}<div role="alert">Your note has not been saved. Check the message below.</div>{% endif %}
   {{ form.non_field_errors }}

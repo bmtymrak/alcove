@@ -6,7 +6,7 @@ from typing import Any, Literal
 from uuid import UUID
 
 from django.db import transaction
-from django.db.models import Case, F, When
+from django.db.models import F
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -275,6 +275,7 @@ def capture(
     return note, True
 
 
+@transaction.atomic
 def edit(
     collection: Collection,
     note_id: UUID,
@@ -301,39 +302,26 @@ def edit(
     if content is not None:
         document, text = validated_content(content)
         changes.update(content=document, plain_text=text)
-    if not isinstance(book, SourceChange):
-        changes["book_id"] = validated_book(collection, book)
-        if isinstance(chapter, SourceChange):
-            # Keep the Chapter only when the source Book is unchanged.
-            changes["chapter_id"] = Case(When(book_id=book, then=F("chapter_id")))
-    if not isinstance(chapter, SourceChange):
-        book_id = None
-        if not isinstance(book, SourceChange):
-            book_id = book
-        elif chapter is not None:
-            current = reading.note(collection, note_id)
-            if current.revision != revision:
-                raise NoteConflict(current.revision)
-            book_id = current.book_id
-        changes["chapter_id"] = validated_chapter(collection, book_id, chapter)
     if not isinstance(page_number, SourceChange):
         changes["page_number"] = validated_page_number(page_number)
     if not isinstance(source_reference, SourceChange):
         changes["source_reference"] = validated_source_reference(source_reference)
-    # Validate references before the transaction so the first transactional
-    # database operation takes SQLite's write lock, including for source edits.
-    with transaction.atomic():
-        changed = (
-            reading.active_notes(collection)
-            .filter(
-                pk=note_id,
-                revision=revision,
-            )
-            .update(**changes)
-        )
-        note = reading.note(collection, note_id)
-        if not changed:
-            raise NoteConflict(note.revision)
-        topics.apply_assignment_changes(note, topic_changes)
-        reading.load_topics(collection, [note])
-        return note
+
+    # Serialize source validation and the edit with Book removal and capture.
+    Collection.objects.filter(pk=collection.pk).update(id=F("id"))
+    current = reading.note(collection, note_id)
+    if current.revision != revision:
+        raise NoteConflict(current.revision)
+    book_id = current.book_id
+    if not isinstance(book, SourceChange):
+        book_id = validated_book(collection, book)
+        changes["book_id"] = book_id
+        if book_id != current.book_id and isinstance(chapter, SourceChange):
+            changes["chapter_id"] = None
+    if not isinstance(chapter, SourceChange):
+        changes["chapter_id"] = validated_chapter(collection, book_id, chapter)
+    reading.active_notes(collection).filter(pk=note_id).update(**changes)
+    note = reading.note(collection, note_id)
+    topics.apply_assignment_changes(note, topic_changes)
+    reading.load_topics(collection, [note])
+    return note

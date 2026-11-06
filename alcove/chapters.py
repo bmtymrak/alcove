@@ -2,11 +2,10 @@ from uuid import UUID
 
 from django.db import transaction
 from django.db.models import F
-from django.http import Http404
 from django.shortcuts import get_object_or_404
 
-from . import note_content
-from .models import Book, Chapter, Collection
+from . import books, note_content
+from .models import Chapter, Collection
 from .notes import NoteError
 
 MAX_LABEL_LENGTH = 300
@@ -24,18 +23,9 @@ def validated_label(value: str) -> str:
     return value
 
 
-def lock_book(collection: Collection, book_id: UUID) -> None:
-    # Acquire SQLite's write lock before reading positions. Append and move
-    # transactions then operate on the latest complete sequence.
-    if not Book.objects.filter(collection=collection, pk=book_id).update(
-        title=F("title")
-    ):
-        raise Http404("Book not found.")
-
-
 @transaction.atomic
 def create(collection: Collection, book_id: UUID, label: str) -> Chapter:
-    lock_book(collection, book_id)
+    books.lock_for_write(collection, book_id)
     return Chapter.objects.create(
         book_id=book_id,
         label=validated_label(label),
@@ -52,7 +42,7 @@ def edit(
     label: str | None = None,
     position: int | None = None,
 ) -> Chapter:
-    lock_book(collection, book_id)
+    books.lock_for_write(collection, book_id)
     sequence = Chapter.objects.filter(book_id=book_id)
     chapter = get_object_or_404(sequence, pk=chapter_id)
     if label is not None:

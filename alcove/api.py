@@ -55,9 +55,13 @@ LIFECYCLE_ERRORS = {
 }
 
 
-def validate_lifecycle_request(request: Request) -> None:
+def validate_empty_action(
+    request: Request,
+    *,
+    message: str = "Note lifecycle actions accept no request fields.",
+) -> None:
     if request.data != {}:
-        raise notes.NoteError("Note lifecycle actions accept no request fields.")
+        raise notes.NoteError(message)
 
 
 def page_response(page: Page[Any], serializer: type[Serializer]) -> Response:
@@ -162,7 +166,7 @@ class NoteView(APIView):
         responses={204: None, **LIFECYCLE_ERRORS},
     )
     def delete(self, request: Request, note_id: UUID) -> Response:
-        validate_lifecycle_request(request)
+        validate_empty_action(request)
         notes.set_trashed(collections.for_owner(request.user), note_id, trashed=True)
         return Response(status=204)
 
@@ -194,7 +198,7 @@ class NoteRestoreView(APIView):
         responses={204: None, **LIFECYCLE_ERRORS},
     )
     def post(self, request: Request, note_id: UUID) -> Response:
-        validate_lifecycle_request(request)
+        validate_empty_action(request)
         notes.set_trashed(collections.for_owner(request.user), note_id, trashed=False)
         return Response(status=204)
 
@@ -208,7 +212,7 @@ class NotePermanentDeletionView(APIView):
         responses={204: None, **LIFECYCLE_ERRORS},
     )
     def delete(self, request: Request, note_id: UUID) -> Response:
-        validate_lifecycle_request(request)
+        validate_empty_action(request)
         notes.delete_permanently(collections.for_owner(request.user), note_id)
         return Response(status=204)
 
@@ -365,6 +369,23 @@ class BookView(APIView):
         payload.is_valid(raise_exception=True)
         book = books.edit(collection, book_id, **payload.validated_data)
         return Response(BookSerializer(book).data)
+
+    @extend_schema(
+        operation_id="books_remove",
+        description=(
+            "Remove the Book and its Chapters. Active and trashed Notes are "
+            "retained with their Book and Chapter associations cleared. "
+            "Send no request body or an empty JSON object."
+        ),
+        request=None,
+        responses={204: None, **WRITE_ERRORS},
+    )
+    def delete(self, request: Request, book_id: UUID) -> Response:
+        validate_empty_action(
+            request, message="Book removal accepts no request fields."
+        )
+        books.remove(collections.for_owner(request.user), book_id)
+        return Response(status=204)
 
 
 class BookChaptersView(APIView):

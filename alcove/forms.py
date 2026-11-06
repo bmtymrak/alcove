@@ -30,12 +30,10 @@ class NoteForm(forms.Form):
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.fields["book"] = forms.TypedChoiceField(
+        self.fields["book"] = forms.UUIDField(
             label="Source book",
             required=False,
-            coerce=UUID,
-            empty_value=None,
-            choices=[("", "No source book"), *book_options],
+            widget=forms.Select(choices=[("", "No source book"), *book_options]),
         )
         self.chapter_options = chapter_options
         self.fields["chapter"] = forms.UUIDField(

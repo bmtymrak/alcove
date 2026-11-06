@@ -207,6 +207,21 @@ def test_book_and_source_contracts_match_real_requests_and_responses(signed_in):
         },
     )
     validate_response(foreign_source, COLLECTION, "post", 400)
+    operation = SCHEMA["paths"][detail]["delete"]
+    assert "requestBody" not in operation
+    assert "content" not in operation["responses"]["204"]
+    validate_response(
+        json_request(signed_in, "delete", path, {"title": "Unexpected"}),
+        detail,
+        "delete",
+        400,
+    )
+    validate_response(signed_in.delete(path), detail, "delete", 403)
+    headers = {"HTTP_X_CSRFTOKEN": signed_in.cookies["csrftoken"].value}
+    removed = signed_in.delete(path, **headers)
+    assert removed.status_code == 204
+    assert not removed.content
+    validate_response(signed_in.delete(path, **headers), detail, "delete", 404)
 
 
 def test_formatted_content_contract_matches_both_deliveries(signed_in):

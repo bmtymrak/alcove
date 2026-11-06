@@ -23,6 +23,7 @@ checks schema drift and validates real request/response examples against it.
 | Add a Book | `POST /api/v1/books/` | `201`, with a relative `Location` header |
 | Read a Book | `GET /api/v1/books/{uuid}/` | `200` |
 | Edit Book metadata | `PATCH /api/v1/books/{uuid}/` | `200` |
+| Remove a Book and keep its Notes | `DELETE /api/v1/books/{uuid}/` | `204` |
 | List a Book's Chapters | `GET /api/v1/books/{book_id}/chapters/` | `200`, an ordered array |
 | Append a Chapter | `POST /api/v1/books/{book_id}/chapters/` | `201` |
 | Rename or move a Chapter | `PATCH /api/v1/books/{book_id}/chapters/{chapter_id}/` | `200` |
@@ -56,6 +57,16 @@ blank titles and null characters are rejected. Distinct Books can share a title.
 A Book response has `id` (stable UUID), `title`, and `author`. PATCH updates only
 submitted metadata fields; `{"author": ""}` clears the author. Null values and
 unknown fields are rejected. Book metadata edits currently use last-write-wins.
+
+Book removal accepts no request body or an empty JSON object. It atomically
+deletes the Book and its Chapters and clears both associations from active and
+trashed Notes. Affected Notes keep their content, Page Numbers, Source
+References, Topics, and Note Links. Their revision and update timestamp advance,
+so an edit using the old revision receives a `409` conflict. Restoring a
+trashed Note keeps it detached. A capture retry with the original UUID and
+payload still returns the saved active Note with its current associations.
+An unknown or out-of-Collection Book returns `404`, including a repeat
+removal. A nonempty JSON body returns `400`.
 
 The Chapter list contains the full sequence in reading order and can be empty.
 Each Chapter has a stable UUID `id`, a string `label`, and a one-based integer
@@ -401,6 +412,9 @@ with links to individual Notes. `/books/{uuid}/notes/new/` preselects the Book;
 Save and add another opens a fresh capture with the saved source selected.
 General capture at `/notes/new/` offers the same source selector and repeat action.
 Clearing the selection makes the next capture standalone.
+The Book page links to `/books/{uuid}/remove/`, which explains what is kept
+and confirms removal with a CSRF-protected POST. In the same tab and session,
+general capture can reopen drafts from removed Books with the source cleared.
 
 Content validation returns `400` with `error.code = "invalid"` and
 `error.fields.content` as an array of messages, for example:
@@ -416,7 +430,7 @@ Enhanced forms send the canonical document through the JSON API with CSRF. Captu
 is explicit and navigates only after a confirmed successful response. The browser
 keeps the submitted document, source, and capture UUID together until it can
 confirm an uncertain result. Retry uses that same input. Save and add another
-starts a fresh capture with the submitted Book selected. Existing-note
+starts a fresh capture with the saved Note's current Book selected. Existing-note
 content and source edits autosave after 500 ms of inactivity, serialize requests,
 and remain in the editor. A successful response confirms only the snapshot sent;
 newer edits remain pending until their own save succeeds. Saving, saved, failed,

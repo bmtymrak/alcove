@@ -5,7 +5,11 @@
 <a href="{% url 'index' %}">← Book library</a>
 <h1>{{ book.title }}</h1>
 {% if book.author %}<p>{{ book.author }}</p>{% endif %}
-<div class="actions"><a class="button" href="{% url 'book-capture' book.id %}">Capture a note from this book</a><a href="{% url 'book-edit' book.id %}">Edit book</a></div>
+<div class="actions">
+  <a class="button" href="{% url 'book-capture' book.id %}">Capture a note from this book</a>
+  <a href="{% url 'book-edit' book.id %}">Edit book</a>
+  <a href="{% url 'book-remove' book.id %}">Remove book</a>
+</div>
 {% include "alcove/chapter_manager.html" %}
 <form method="get" class="actions">
   <label for="order">Note order</label>

@@ -1,8 +1,13 @@
 from uuid import UUID
 
+from django.db import transaction
+from django.db.models import F
+from django.http import Http404
+from django.utils import timezone
+
 from . import reading
-from .models import Book, Collection
-from .notes import NoteError
+from .errors import NoteError
+from .models import Book, Collection, Note
 
 MAX_METADATA_LENGTH = 300
 
@@ -48,3 +53,23 @@ def edit(
     }
     Book.objects.filter(collection=collection, pk=book_id).update(**fields)
     return reading.book(collection, book_id)
+
+
+def lock_for_write(collection: Collection, book_id: UUID) -> None:
+    # Acquire SQLite's write lock before reading the Book's dependent records.
+    if not Book.objects.filter(collection=collection, pk=book_id).update(
+        title=F("title")
+    ):
+        raise Http404("Book not found.")
+
+
+@transaction.atomic
+def remove(collection: Collection, book_id: UUID) -> None:
+    lock_for_write(collection, book_id)
+    Note.objects.filter(collection=collection, book_id=book_id).update(
+        book=None,
+        chapter=None,
+        revision=F("revision") + 1,
+        updated_at=timezone.now(),
+    )
+    Book.objects.filter(collection=collection, pk=book_id).delete()

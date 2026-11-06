@@ -1026,3 +1026,49 @@ def test_autosave_retains_pending_edits_while_note_is_in_trash(page, live_server
     expect(page.get_by_role("status")).to_have_text("Saved.")
     page.reload()
     expect(editor).to_have_text("A pending edit from another tab.")
+
+
+def test_remove_book_keeps_saved_notes_and_recovers_its_capture_draft(
+    page, live_server
+):
+    page.goto(live_server.url + "/login/")
+    page.get_by_label("Username").fill("reader")
+    page.get_by_label("Password").fill(PASSWORD)
+    page.get_by_role("button", name="Sign in", exact=True).click()
+    page.get_by_role("link", name="Add a book").click()
+    page.get_by_label("Title").fill("A temporary source")
+    page.get_by_role("button", name="Save book").click()
+    book_url = page.url
+
+    page.get_by_role("link", name="Capture a note from this book").click()
+    page.get_by_label("Your note").fill("A thought worth keeping.")
+    page.get_by_label("Page number").fill("42")
+    page.get_by_role("button", name="Save and add another").click()
+    editor = page.get_by_label("Your note")
+    expect(editor).to_have_text("")
+    editor.fill("An unfinished thought.")
+    page.get_by_label("Source reference").fill("Footnote 3")
+
+    page.goto(book_url)
+    page.get_by_role("link", name="Remove book").click()
+    expect(
+        page.get_by_text("Active and trashed Notes will be kept", exact=False)
+    ).to_be_visible()
+    page.get_by_role("link", name="Cancel").click()
+    expect(page).to_have_url(book_url)
+    page.get_by_role("link", name="Remove book").click()
+    page.get_by_role("button", name="Remove book").click()
+    expect(page.get_by_role("heading", name="Book library")).to_be_visible()
+    expect(page.get_by_role("link", name="A temporary source")).to_have_count(0)
+
+    page.get_by_role("link", name="All notes", exact=True).last.click()
+    expect(page.get_by_text("A thought worth keeping.", exact=True)).to_be_visible()
+    expect(page.get_by_text("Page 42", exact=True)).to_be_visible()
+    page.get_by_role("link", name="Capture a note", exact=True).last.click()
+    page.get_by_role("link", name="Resume capture from a removed book").click()
+    expect(editor).to_have_text("An unfinished thought.")
+    expect(page.get_by_label("Source book")).to_have_value("")
+    expect(page.get_by_label("Source reference")).to_have_value("Footnote 3")
+    page.get_by_role("button", name="Save and add another").click()
+    expect(page).to_have_url(live_server.url + "/notes/new/")
+    expect(editor).to_have_text("")

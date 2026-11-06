@@ -88,7 +88,7 @@ export function explicitCapture(form, editor, draft, initialBook, picker) {
       persisted = true
       confirmed = true
       status.textContent = 'Saved.'
-      const nextCapture = payload.book ? `/books/${payload.book}/notes/new/` : '/notes/new/'
+      const nextCapture = result.book ? `/books/${result.book}/notes/new/` : '/notes/new/'
       window.location.assign(another
         ? draft.nextCapturePath(nextCapture, pending.captureId)
         : `/notes/${result.id}/`)

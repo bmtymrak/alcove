@@ -187,6 +187,55 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: Send application/json.
+    delete:
+      operationId: books_remove
+      description: Remove the Book and its Chapters. Active and trashed Notes are
+        retained with their Book and Chapter associations cleared. Send no request
+        body or an empty JSON object.
+      parameters:
+      - in: path
+        name: book_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - books
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Sign-in or CSRF required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Not found in your Collection.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Method not allowed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid fields or JSON.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Send application/json.
   /api/v1/books/{book_id}/chapters/:
     get:
       operationId: book_chapters_list

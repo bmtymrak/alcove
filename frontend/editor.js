@@ -44,8 +44,12 @@ function initializeEditor(form) {
     if (recovered) {
       source.value = JSON.stringify(stored)
       for (const input of noteSourceInputs(form)) {
-        if (input.name === 'chapter') syncChapter(recovered.chapter)
-        if (input.name in recovered) input.value = recovered[input.name] ?? ''
+        if (input.name === 'chapter') {
+          syncChapter(recovered.chapter)
+        } else if (input.name in recovered) {
+          input.value = recovered[input.name] ?? ''
+          if (input === book && book.selectedIndex === -1) book.value = ''
+        }
       }
     }
     const content = stored.format === 'tiptap' ? stored.doc : {

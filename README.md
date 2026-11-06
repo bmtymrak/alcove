@@ -69,7 +69,7 @@ location, set `PLAYWRIGHT_BROWSERS_PATH` for both installation and test runs.
 ## Application boundaries
 
 `alcove.collections.for_owner` resolves the authenticated Collection.
-`alcove.books.create/edit` own Book metadata changes.
+`alcove.books` owns Book metadata changes and removal.
 `alcove.notes.capture/edit` own content validation, projection, source validation,
 Topic Assignment changes, and revision-checked mutation; `alcove.reading` owns scoped Book/Note retrieval,
 ordering, and deterministic pagination.
@@ -120,7 +120,10 @@ Note by text, Book, or Topic. Related Notes show their source and Topics, and
 you can follow or remove the link from either Note. Select **Move to trash**
 on a Note to hide it from reading and the link picker. Open **Trash** to restore
 the Note with its surviving source, Topics, and Note Links, or confirm permanent
-deletion. Trash has no expiry. Collection-wide search and portability are
+deletion. On a Book page, **Remove book** removes the Book and its Chapters
+and keeps its active and trashed Notes with their remaining associations.
+General capture offers drafts from removed Books in the same tab and session.
+Trash has no expiry. Collection-wide search and portability are
 planned separately.
 
 ## Editor assets

@@ -24,6 +24,7 @@ urlpatterns = [
     path("books/new/", views.book_form, name="book-create"),
     path("books/<uuid:book_id>/", views.book_detail, name="book"),
     path("books/<uuid:book_id>/edit/", views.book_form, name="book-edit"),
+    path("books/<uuid:book_id>/remove/", views.book_remove, name="book-remove"),
     path("notes/", views.note_list, name="notes"),
     path("notes/trash/", views.note_trash, name="note-trash"),
     path("topics/", views.topic_tree, name="topic-tree"),

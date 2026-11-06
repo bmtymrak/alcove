@@ -1,0 +1,12 @@
+{% extends "alcove/base.html" %}
+{% block title %}Remove book · Alcove{% endblock %}
+{% block content %}
+<h1>Remove {{ book.title }}?</h1>
+{% if book.author %}<p>{{ book.author }}</p>{% endif %}
+<p>This removes the Book and its Chapters. Active and trashed Notes will be kept, along with their page numbers, source references, Topics, and related Notes.</p>
+<form method="post" class="actions">
+  {% csrf_token %}
+  <button type="submit">Remove book</button>
+  <a href="{% url 'book' book.id %}">Cancel</a>
+</form>
+{% endblock %}
