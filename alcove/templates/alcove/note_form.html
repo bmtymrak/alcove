@@ -37,8 +37,10 @@
   <section id="save-conflict" aria-label="Review conflict" hidden>
     <h2>Current saved note</h2>
     <p>Revision <span data-current-revision></span> · Source: <span data-current-source></span></p>
+    <p>Page number: <span data-current-page></span><br>
+      Source reference: <span data-current-reference></span></p>
     <pre data-current-content></pre>
-    <p>Your pending version remains in the editor above. Reconcile your changes there before saving your version over the reviewed revision.</p>
+    <p>Your pending version remains in this form. Reconcile your changes before saving your version over the reviewed revision.</p>
     <button type="button" data-resolve-conflict hidden>Save my version</button>
   </section>
   {% endif %}
@@ -52,6 +54,10 @@
   </details>
   {{ form.book.errors }}
   {{ form.book.label_tag }}{{ form.book }}
+  {{ form.page_number.errors }}
+  {{ form.page_number.label_tag }}{{ form.page_number }}
+  {{ form.source_reference.errors }}
+  {{ form.source_reference.label_tag }}{{ form.source_reference }}
   <div class="actions">
     <button data-explicit-save>{% if note %}Save changes{% else %}Save note{% endif %}</button>
     {% if not note %}<button name="add_another" value="1">Save and add another</button>{% endif %}

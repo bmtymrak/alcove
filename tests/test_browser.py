@@ -205,36 +205,44 @@ def test_book_marginalia_capture_and_inline_reading(page, live_server, owner, vi
     selected_book = page.get_by_label("Source book").input_value()
     assert selected_book
     page.get_by_label("Your note").fill("First marginalium.")
+    page.get_by_label("Page number").fill("10")
+    page.get_by_label("Source reference").fill("pp. 10–12, footnote 3")
     page.get_by_role("button", name="Save and add another", exact=True).click()
     expect(page.get_by_label("Your note")).to_have_text("")
     expect(page.get_by_label("Source book")).to_have_value(selected_book)
+    expect(page.get_by_label("Page number")).to_have_value("")
+    expect(page.get_by_label("Source reference")).to_have_value("")
     page.get_by_role("button", name="Save and add another", exact=True).click()
     expect(
         page.get_by_text("Write something before saving.", exact=True)
     ).to_be_visible()
     expect(page.get_by_label("Source book")).to_have_value(selected_book)
     page.get_by_label("Your note").fill("Second marginalium.")
+    page.get_by_label("Page number").fill("9")
     page.get_by_role("button", name="Save note", exact=True).click()
     expect(page.get_by_role("link", name="Edit note", exact=True)).to_be_visible()
     page.goto(book_url)
     expect(page.locator(".note-content")).to_have_text(
         ["First marginalium.", "Second marginalium."]
     )
-    page.get_by_label("Capture order").select_option("newest")
+    expect(page.get_by_text("Source reference: pp. 10–12, footnote 3")).to_be_visible()
+    page.get_by_label("Note order").select_option("page")
     page.get_by_role("button", name="Apply order", exact=True).click()
     expect(page.locator(".note-content")).to_have_text(
         ["Second marginalium.", "First marginalium."]
     )
     page.reload()
-    expect(page.get_by_label("Capture order")).to_have_value("newest")
+    expect(page.get_by_label("Note order")).to_have_value("page")
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
     page.get_by_role("link", name="Open note", exact=False).first.click()
     expect(page.get_by_role("link", name="Ways of Seeing", exact=True)).to_be_visible()
     page.get_by_role("link", name="Edit note", exact=True).click()
+    expect(page.get_by_role("status")).to_have_text("Saved.")
     page.get_by_label("Source book").select_option("")
     expect(page.get_by_role("status")).to_have_text("Saved.")
     page.goto(page.url.removesuffix("edit/"))
     expect(page.get_by_role("link", name="Edit note", exact=True)).to_be_visible()
+    expect(page.get_by_text("Page 9", exact=True)).to_be_visible()
     page.goto(book_url)
     expect(page.locator(".note-content")).to_have_text(["First marginalium."])
 
@@ -405,8 +413,16 @@ def test_capture_recovers_formatting_and_source_after_navigation_and_reload(
     page.get_by_role("button", name="Save book", exact=True).click()
     page.goto(live_server.url + "/notes/new/")
     source = page.get_by_label("Source book")
-    source.select_option(label="A source for later")
     editor = page.get_by_label("Your note")
+    expect(editor).to_be_visible()
+    page.get_by_label("Page number").fill("34")
+    page.get_by_label("Source reference").fill("Footnote saved before the text")
+    page.reload()
+    expect(page.get_by_label("Page number")).to_have_value("34")
+    expect(page.get_by_label("Source reference")).to_have_value(
+        "Footnote saved before the text"
+    )
+    source.select_option(label="A source for later")
     editor.fill("An unfinished quotation.")
     editor.press("ControlOrMeta+a")
     page.get_by_role("button", name="Quotation", exact=True).click()
@@ -439,6 +455,8 @@ def test_lost_book_capture_response_can_be_retried_after_reload(page, live_serve
     endpoint = "**/api/v1/notes/"
     page.route(endpoint, lose_acknowledgement)
     editor.fill("A quotation worth repeating.")
+    page.get_by_label("Page number").fill("42")
+    page.get_by_label("Source reference").fill("Footnote 8")
     another.click()
     expect(page.get_by_role("status")).to_have_text("Save not confirmed.")
     expect(page).to_have_url(capture_url)
@@ -448,6 +466,9 @@ def test_lost_book_capture_response_can_be_retried_after_reload(page, live_serve
     page.reload()
     expect(editor).to_have_text("A quotation worth repeating.")
     expect(source).to_have_value(selected_book)
+    expect(page.get_by_label("Page number")).to_have_value("42")
+    expect(page.get_by_label("Source reference")).to_have_value("Footnote 8")
+    expect(page.get_by_label("Source reference")).to_be_disabled()
     page.unroute(endpoint)
     another.click()
     expect(editor).to_have_text("")
@@ -461,6 +482,7 @@ def test_lost_book_capture_response_can_be_retried_after_reload(page, live_serve
     expect(page.locator(".note-content")).to_have_text(
         ["A quotation worth repeating.", "A quotation worth repeating."]
     )
+    expect(page.get_by_text("Source reference: Footnote 8", exact=True)).to_be_visible()
 
 
 @pytest.mark.parametrize("failure", ["validation", "conflict"])
@@ -473,6 +495,7 @@ def test_pending_edits_recover_after_reload_without_replacing_saved_note(
         second_tab = page.context.new_page()
         second_tab.goto(page.url)
         second_tab.get_by_label("Your note").fill("The latest saved thought.")
+        second_tab.get_by_label("Source reference").fill("Other tab's reference")
         expect(second_tab.get_by_role("status")).to_have_text("Saved.")
         second_tab.close()
         status = "Conflict. Your draft is still here."
@@ -487,10 +510,14 @@ def test_pending_edits_recover_after_reload_without_replacing_saved_note(
 
     editor = page.get_by_label("Your note")
     editor.fill("My pending thought.")
+    page.get_by_label("Page number").fill("19")
+    page.get_by_label("Source reference").fill("My pending reference")
     expect(page.get_by_role("status")).to_have_text(status)
     page.unroute(endpoint)
     page.reload()
     expect(editor).to_have_text("My pending thought.")
+    expect(page.get_by_label("Page number")).to_have_value("19")
+    expect(page.get_by_label("Source reference")).to_have_value("My pending reference")
     expect(page.get_by_role("status")).to_have_text(status)
 
     if failure == "conflict":
@@ -498,12 +525,17 @@ def test_pending_edits_recover_after_reload_without_replacing_saved_note(
         expect(page.locator("[data-current-content]")).to_have_text(
             "The latest saved thought."
         )
+        expect(page.locator("[data-current-reference]")).to_have_text(
+            "Other tab's reference"
+        )
         page.get_by_role("button", name="Save my version").click()
     else:
         page.get_by_role("button", name="Retry saving").click()
     expect(page.get_by_role("status")).to_have_text("Saved.")
     page.reload()
     expect(editor).to_have_text("My pending thought.")
+    expect(page.get_by_label("Page number")).to_have_value("19")
+    expect(page.get_by_label("Source reference")).to_have_value("My pending reference")
 
 
 def test_signing_out_from_another_page_clears_local_drafts(page, live_server):

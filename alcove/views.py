@@ -62,14 +62,12 @@ def capture(request: HttpRequest, book_id: UUID | None = None) -> HttpResponse:
                 form.cleaned_data["document"],
                 book=form.cleaned_data["book"],
                 capture_id=form.cleaned_data["capture_id"],
+                page_number=form.cleaned_data["page_number"],
+                source_reference=form.cleaned_data["source_reference"],
             )
         except notes.NoteError as exc:
             status = exc.status
-            if not exc.fields:
-                form.add_error(None, str(exc))
-            for field, messages in exc.fields.items():
-                for message in messages:
-                    form.add_error(field, message)
+            form.add_note_error(exc)
         else:
             if "add_another" in request.POST:
                 if form.cleaned_data["book"]:
@@ -109,6 +107,8 @@ def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
             ),
             "revision": note.revision,
             "book": note.book_id,
+            "page_number": note.page_number,
+            "source_reference": note.source_reference,
         },
         book_options=reading.book_options(collection),
     )
@@ -118,12 +118,17 @@ def edit(request: HttpRequest, note_id: UUID) -> HttpResponse:
             notes.edit(
                 collection,
                 note_id,
-                form.cleaned_data["document"],
-                form.cleaned_data["revision"],
+                content=form.cleaned_data["document"],
+                revision=form.cleaned_data["revision"],
                 book=form.cleaned_data["book"],
+                **{
+                    field: form.cleaned_data[field]
+                    for field in ("page_number", "source_reference")
+                    if field in request.POST
+                },
             )
         except notes.NoteError as exc:
-            form.add_error(None, str(exc))
+            form.add_note_error(exc)
             status = exc.status
         else:
             return redirect("note", note_id=note.id)

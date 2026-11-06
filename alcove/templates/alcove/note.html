@@ -4,8 +4,8 @@
 {% block content %}
 <a href="{% url 'notes' %}">← All notes</a>
 <h1>Your note</h1>
-{% if note.book %}<p>Source: <a href="{% url 'book' note.book.id %}">{{ note.book.title }}</a>{% if note.book.author %} · {{ note.book.author }}{% endif %}</p>{% endif %}
 <article class="panel">
+  {% include "alcove/note_source.html" %}
   <div class="note-content">{{ note.content|render_note }}</div>
   <p class="metadata">Captured {{ note.captured_at|date:"M j, Y, H:i" }} UTC<br>Updated {{ note.updated_at|date:"M j, Y, H:i" }} UTC</p>
 </article>

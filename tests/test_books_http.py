@@ -152,7 +152,11 @@ def test_book_note_ordering_paginates_equally_through_html_and_json(
         assert response.status_code == 201
         captured.append(response.json())
     expected = sorted(captured, key=lambda n: n["id"])
-    for order, ordered in [("oldest", expected), ("newest", expected[::-1])]:
+    for order, ordered in [
+        ("oldest", expected),
+        ("newest", expected[::-1]),
+        ("page", expected),
+    ]:
         for page, subset in [(1, ordered[:20]), (2, ordered[20:])]:
             query = f"?order={order}&page={page}"
             response = signed_in.get(f"/api/v1/books/{book['id']}/notes/" + query)
@@ -218,10 +222,12 @@ def test_foreign_books_are_private_and_cannot_be_note_sources(signed_in):
     assert "Private book" not in other.get("/notes/new/").content.decode()
     for path in [
         f"/books/{book['id']}/",
+        f"/books/{book['id']}/?order=page",
         f"/books/{book['id']}/edit/",
         f"/books/{book['id']}/notes/new/",
         f"/api/v1/books/{book['id']}/",
         f"/api/v1/books/{book['id']}/notes/",
+        f"/api/v1/books/{book['id']}/notes/?order=page",
     ]:
         assert other.get(path).status_code == 404
     assert (
@@ -260,7 +266,12 @@ def test_foreign_books_are_private_and_cannot_be_note_sources(signed_in):
         {"content": document("Keep this."), "book": own_book["id"]},
     ).json()
     for source in [book["id"], "00000000-0000-0000-0000-000000000000", "invalid"]:
-        payload = {"content": document("Rejected capture."), "book": source}
+        payload = {
+            "content": document("Rejected capture."),
+            "book": source,
+            "page_number": 42,
+            "source_reference": "Footnote 3",
+        }
         response = json_request(other, "post", "/api/v1/notes/", payload)
         assert response.status_code == 400
         assert "book" in response.json()["error"]["fields"]
@@ -278,6 +289,8 @@ def test_foreign_books_are_private_and_cannot_be_note_sources(signed_in):
                 {
                     "content": "Retain my unsaved text.",
                     "book": source,
+                    "page_number": "42",
+                    "source_reference": "Footnote 3",
                     "revision": 1,
                     "csrfmiddlewaretoken": other.cookies["csrftoken"].value,
                 },

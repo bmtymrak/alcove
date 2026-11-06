@@ -41,11 +41,19 @@ Capture body:
 Capture may also include `"book": "<book-uuid>"`; omission or null creates a
 standalone Note. Each Note has at most one source Book.
 
+Send an optional `"page_number": 42` for the starting page and
+`"source_reference": "pp. 42–44, footnote 3"` for the written location. Either
+field can be used independently, including on a standalone Note. Page Numbers
+must be JSON integers from 1 to 2147483647. Source References are plain text,
+with line endings normalized to LF. Omitted values default to null for the page
+and the empty string for the reference.
+
 Send an optional `"capture_id": "<uuid>"` to make a capture safe to retry.
 Generate a fresh UUID for each new capture, even when two Notes have identical
 content and source. After a timeout or lost response, resend the same UUID,
-document, and source. The first successful request creates the Note and returns
-`201`. A replay returns `200` and the current representation of the same Note,
+document, Book, Page Number, and Source Reference. The first successful request
+creates the Note and returns `201`. A replay returns `200` and the current
+representation of the same Note,
 including any later edits. Both responses include its `Location`. The identity
 is scoped to the signed-in Collection. Reusing it there with different content or
 source returns `409` with `error.code = "capture_conflict"` and leaves the Note
@@ -60,12 +68,14 @@ sent, replaces the complete document:
 ```
 
 Send `{"book": "<book-uuid>", "revision": 1}` to assign or change the source,
-or `{"book": null, "revision": 1}` to clear it. Omitted `book` and `content`
-remain unchanged. Source changes use the same revision precondition as content;
-a stale change returns `409` without changing either field. Another Collection's
+or `{"book": null, "revision": 1}` to clear it. Send `"page_number": null` or
+`"source_reference": ""` to clear those fields. PATCH preserves omitted fields.
+Source changes use the same revision precondition as content. A stale change
+returns `409` without saving. Another Collection's
 Book and an unknown Book both produce a `400` field error on `book` without saving.
 
-A Note response has `id` (stable UUID), `book` (UUID or null), `content` (canonical document), `plain_text`
+A Note response has `id` (stable UUID), `book` (UUID or null), `page_number`
+(integer or null), `source_reference` (string), `content` (canonical document), `plain_text`
 (derived text), `captured_at` and `updated_at` (UTC ISO 8601), and `revision`
 (positive integer starting at 1). Editing preserves identity and capture time and
 increments the revision atomically. There is no caller-supplied ownership field;
@@ -145,8 +155,10 @@ an empty Collection has an empty page 1. Invalid/out-of-range pages return `404`
 The all-Notes list is oldest capture first, then UUID as the deterministic
 tiebreaker. The library is ordered by title then UUID. A Book's Notes use the same
 pagination envelope, scoped to that Book, with `order=oldest` by default or
-`order=newest` to reverse both capture timestamp and UUID. Invalid ordering returns
-`404`. HTML Book pages use the same ordering and pagination and retain the selected
+`order=newest` to reverse both capture timestamp and UUID. `order=page` sorts by
+ascending numeric Page Number with missing pages last. Ties use oldest capture
+first, then ascending UUID. Invalid ordering returns `404`. HTML Book pages use
+the same ordering and pagination and retain the selected
 order across pages. No search or general Note filters are supported yet.
 
 ## Errors and safe retries

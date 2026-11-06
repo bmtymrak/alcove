@@ -3,7 +3,7 @@
 A private Collection of reading notes, served by Django templates and a same-origin
 versioned JSON API. Sign in to a Book library, add Books with optional authors,
 and repeatedly capture their Notes with Save and add another. General Note capture,
-inline Book reading, source editing, and oldest/newest capture ordering are available
+inline Book reading, source editing, and capture or numeric page ordering are available
 through HTML and JSON. Notes support paragraphs, bold/italic emphasis, lists,
 quotations, and clickable website links in a limited open-source Tiptap editor
 ([Ticket #5](https://github.com/bmtymrak/alcove/issues/5)).
@@ -86,8 +86,10 @@ editor converts it to paragraphs when saved. No data migration is needed. A titl
 required. Each Note can have one source Book or none. Book titles need not be
 unique; title alone is enough to create a Book. The library is the signed-in start
 page at `/`, with all Notes still available at `/notes/`. A Book page shows its
-Notes inline, oldest capture first by default, with a newest-first option; Save
-and add another retains the selected Book. Existing standalone Notes remain
+Notes inline, oldest capture first by default, with newest-first and numeric
+Page Number options. A Note can also have a free-text Source Reference for a
+range, footnote, or other location. Save and add another retains the selected
+Book and starts with empty location fields. Existing standalone Notes remain
 unassigned after upgrading. Apply the new migrations before starting the server.
 
 Existing Notes autosave content and source changes after a short pause, with one

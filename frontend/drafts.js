@@ -69,8 +69,17 @@ function captureSlot(path, alternative) {
 }
 
 export function noteSnapshot(form) {
+  const pageText = form.elements.page_number.value.trim()
+  const page = Number(pageText)
   return JSON.stringify({
     content: JSON.parse(form.querySelector('[name="content_document"]').value),
-    book: form.querySelector('[name="book"]').value || null,
+    book: form.elements.book.value || null,
+    page_number: pageText && /^[0-9]+$/.test(pageText) && Number.isSafeInteger(page)
+      ? page : pageText || null,
+    source_reference: form.elements.source_reference.value,
   })
+}
+
+export function noteSourceInputs(form) {
+  return [form.elements.book, form.elements.page_number, form.elements.source_reference]
 }

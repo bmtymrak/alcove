@@ -113,16 +113,21 @@ def test_book_and_source_contracts_match_real_requests_and_responses(signed_in):
     validate_response(
         json_request(signed_in, "patch", path, payload), detail, "patch", 200
     )
-    payload = {"content": document("A sourced thought."), "book": book["id"]}
+    payload = {
+        "content": document("A sourced thought."),
+        "book": book["id"],
+        "page_number": 42,
+        "source_reference": "pp. 42–44",
+    }
     validate_request(payload, COLLECTION, "post")
     response = json_request(signed_in, "post", COLLECTION, payload)
     validate_response(response, COLLECTION, "post", 201)
     note_path = response["Location"]
     assert response.json()["book"] == book["id"]
-    validate_response(
-        signed_in.get(path + "notes/?order=newest"), book_notes, "get", 200
-    )
-    payload = {"book": None, "revision": 1}
+    assert response.json()["page_number"] == 42
+    assert response.json()["source_reference"] == "pp. 42–44"
+    validate_response(signed_in.get(path + "notes/?order=page"), book_notes, "get", 200)
+    payload = {"book": None, "page_number": None, "source_reference": "", "revision": 1}
     validate_request(payload, DETAIL, "patch")
     response = json_request(signed_in, "patch", note_path, payload)
     validate_response(response, DETAIL, "patch", 200)

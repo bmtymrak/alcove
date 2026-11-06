@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -10,6 +11,7 @@ from .notes import (
     NoteError,
     plain_text_content,
     validated_content,
+    validated_page_number,
 )
 
 
@@ -48,6 +50,26 @@ class NoteForm(forms.Form):
             self.document_rejected = str(exc) != "Write something before saving."
         return data
 
+    def clean_page_number(self) -> int | None:
+        raw = self.cleaned_data["page_number"]
+        value = None if not raw else raw
+        if re.fullmatch(r"[0-9]+", raw):
+            digits = raw.lstrip("0") or "0"
+            # Avoid converting arbitrarily long submitted integers.
+            if len(digits) <= 10:
+                value = int(digits)
+        try:
+            return validated_page_number(value)
+        except NoteError as exc:
+            raise forms.ValidationError(str(exc)) from exc
+
+    def add_note_error(self, error: NoteError) -> None:
+        if not error.fields:
+            self.add_error(None, str(error))
+        for field, messages in error.fields.items():
+            for message in messages:
+                self.add_error(field, message)
+
     content_document = forms.CharField(
         label="Formatted content (JSON)",
         required=False,
@@ -68,6 +90,17 @@ class NoteForm(forms.Form):
                 "aria-describedby": "content-help",
             }
         ),
+    )
+    page_number = forms.CharField(
+        label="Page number",
+        required=False,
+        widget=forms.TextInput(attrs={"inputmode": "numeric"}),
+    )
+    source_reference = forms.CharField(
+        label="Source reference",
+        required=False,
+        strip=False,
+        widget=forms.Textarea(attrs={"rows": 2}),
     )
 
 

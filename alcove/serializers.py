@@ -31,9 +31,46 @@ class CaptureIdentityField(serializers.UUIDField):
         return super().to_internal_value(data)
 
 
-class CaptureSerializer(StrictSerializer):
-    content = ContentField()
+class StrictIntegerField(serializers.IntegerField):
+    def to_internal_value(self, data: Any) -> int:
+        if type(data) is not int:
+            self.fail("invalid")
+        return super().to_internal_value(data)
+
+
+class SourceReferenceField(serializers.CharField):
+    def to_internal_value(self, data: Any) -> str:
+        return notes.validated_source_reference(data)
+
+
+class PageNumberField(serializers.IntegerField):
+    def to_internal_value(self, data: Any) -> int:
+        value = notes.validated_page_number(data)
+        assert value is not None  # DRF handles null before converting a value.
+        return value
+
+
+class NoteSourceSerializer(StrictSerializer):
     book = serializers.UUIDField(required=False, allow_null=True)
+    page_number = PageNumberField(
+        required=False,
+        allow_null=True,
+        min_value=1,
+        max_value=notes.MAX_PAGE_NUMBER,
+        help_text="Starting page for numeric ordering. Null clears the anchor.",
+    )
+    source_reference = SourceReferenceField(
+        required=False,
+        allow_blank=True,
+        trim_whitespace=False,
+        help_text=(
+            "Free-text location, such as a page range or footnote. Empty clears it."
+        ),
+    )
+
+
+class CaptureSerializer(NoteSourceSerializer):
+    content = ContentField()
     capture_id = CaptureIdentityField(
         required=False,
         help_text=(
@@ -43,17 +80,9 @@ class CaptureSerializer(StrictSerializer):
     )
 
 
-class RevisionField(serializers.IntegerField):
-    def to_internal_value(self, data: Any) -> int:
-        if type(data) is not int:
-            self.fail("invalid")
-        return super().to_internal_value(data)
-
-
-class EditSerializer(StrictSerializer):
+class EditSerializer(NoteSourceSerializer):
     content = ContentField(required=False)
-    book = serializers.UUIDField(required=False, allow_null=True)
-    revision = RevisionField(
+    revision = StrictIntegerField(
         min_value=1,
         max_value=notes.MAX_EXPECTED_REVISION,
         help_text=(
@@ -66,6 +95,10 @@ class NoteSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     content = ContentField()
     book = serializers.UUIDField(source="book_id", allow_null=True)
+    page_number = serializers.IntegerField(
+        allow_null=True, min_value=1, max_value=notes.MAX_PAGE_NUMBER
+    )
+    source_reference = serializers.CharField(allow_blank=True)
     plain_text = serializers.CharField()
     captured_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()

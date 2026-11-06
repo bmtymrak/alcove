@@ -204,8 +204,10 @@ paths:
           enum:
           - newest
           - oldest
-        description: Default oldest. Capture timestamp then UUID; newest reverses
-          both.
+          - page
+        description: Default oldest. Newest reverses capture order. Page sorts numerically
+          with missing pages last and oldest captures first for ties. UUID breaks
+          final ties.
       - in: query
         name: page
         schema:
@@ -511,13 +513,24 @@ components:
     CaptureRequest:
       type: object
       properties:
-        content:
-          $ref: '#/components/schemas/NoteContent'
         book:
           type:
           - string
           - 'null'
           format: uuid
+        page_number:
+          type:
+          - integer
+          - 'null'
+          maximum: 2147483647
+          minimum: 1
+          description: Starting page for numeric ordering. Null clears the anchor.
+        source_reference:
+          type: string
+          description: Free-text location, such as a page range or footnote. Empty
+            clears it.
+        content:
+          $ref: '#/components/schemas/NoteContent'
         capture_id:
           type: string
           format: uuid
@@ -555,13 +568,24 @@ components:
     EditRequest:
       type: object
       properties:
-        content:
-          $ref: '#/components/schemas/NoteContent'
         book:
           type:
           - string
           - 'null'
           format: uuid
+        page_number:
+          type:
+          - integer
+          - 'null'
+          maximum: 2147483647
+          minimum: 1
+          description: Starting page for numeric ordering. Null clears the anchor.
+        source_reference:
+          type: string
+          description: Free-text location, such as a page range or footnote. Empty
+            clears it.
+        content:
+          $ref: '#/components/schemas/NoteContent'
         revision:
           type: integer
           maximum: 9223372036854775806
@@ -605,6 +629,14 @@ components:
           - string
           - 'null'
           format: uuid
+        page_number:
+          type:
+          - integer
+          - 'null'
+          maximum: 2147483647
+          minimum: 1
+        source_reference:
+          type: string
         plain_text:
           type: string
         captured_at:
@@ -622,8 +654,10 @@ components:
       - captured_at
       - content
       - id
+      - page_number
       - plain_text
       - revision
+      - source_reference
       - updated_at
     NoteBlock:
       oneOf:

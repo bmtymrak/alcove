@@ -4,7 +4,7 @@ import { Link } from '@tiptap/extension-link'
 import { OrderedList } from '@tiptap/extension-list'
 import { autosave } from './autosave'
 import { explicitCapture } from './capture'
-import { noteDraft } from './drafts'
+import { noteDraft, noteSourceInputs } from './drafts'
 
 const form = document.querySelector('[data-note-editor]')
 if (form) initializeEditor(form)
@@ -39,7 +39,9 @@ function initializeEditor(form) {
       : { format: 'plain-text', text: plain.value })
     if (recovered) {
       source.value = JSON.stringify(stored)
-      book.value = recovered.book || ''
+      for (const input of noteSourceInputs(form)) {
+        if (input.name in recovered) input.value = recovered[input.name] ?? ''
+      }
     }
     const content = stored.format === 'tiptap' ? stored.doc : {
       type: 'doc',

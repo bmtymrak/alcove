@@ -127,13 +127,7 @@ class NoteView(APIView):
         reading.note(collection, note_id)
         payload = EditSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
-        note = notes.edit(
-            collection,
-            note_id,
-            payload.validated_data.get("content"),
-            payload.validated_data["revision"],
-            book=payload.validated_data.get("book", notes.SourceChange.UNCHANGED),
-        )
+        note = notes.edit(collection, note_id, **payload.validated_data)
         return Response(NoteSerializer(note).data)
 
 
@@ -210,9 +204,11 @@ class BookNotesView(APIView):
             OpenApiParameter(
                 "order",
                 str,
-                enum=["oldest", "newest"],
+                enum=list(reading.BOOK_NOTE_ORDERING),
                 description=(
-                    "Default oldest. Capture timestamp then UUID; newest reverses both."
+                    "Default oldest. Newest reverses capture order. Page sorts "
+                    "numerically with missing pages last and oldest captures first "
+                    "for ties. UUID breaks final ties."
                 ),
             ),
         ],

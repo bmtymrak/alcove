@@ -15,6 +15,7 @@ a { color: #315c40; text-underline-offset: 0.2em; }
 label { display: block; font-weight: 600; margin: 1rem 0 0.5rem; }
 input, textarea, select { width: 100%; font: inherit; color: inherit; border: 1px solid #7a8978; border-radius: 0.3rem; padding: 0.7rem; background: white; }
 textarea { min-height: 12rem; resize: vertical; }
+#id_source_reference { min-height: 0; }
 button, .button { display: inline-block; cursor: pointer; font: inherit; font-weight: 600; background: #315c40; color: white; border: 1px solid #315c40; border-radius: 0.3rem; padding: 0.65rem 1rem; text-decoration: none; min-height: 44px; }
 button.quiet { background: transparent; color: #315c40; }
 :focus-visible { outline: 3px solid #9a640c; outline-offset: 3px; }

@@ -14,6 +14,7 @@ from .models import Collection, Note
 MAX_CONTENT_LENGTH = note_content.MAX_CONTENT_LENGTH
 # Leave room for the increment in SQLite's signed 64-bit integer storage.
 MAX_EXPECTED_REVISION = 2**63 - 2
+MAX_PAGE_NUMBER = 2**31 - 1
 
 
 class NoteError(Exception):
@@ -69,16 +70,39 @@ def validated_book(collection: Collection, book_id: UUID | None) -> UUID | None:
     return book_id
 
 
+def validated_page_number(value: Any) -> int | None:
+    if value is None:
+        return None
+    if type(value) is not int or not 1 <= value <= MAX_PAGE_NUMBER:
+        message = f"Enter a whole Page Number from 1 to {MAX_PAGE_NUMBER}."
+        raise NoteError(message, fields={"page_number": [message]})
+    return value
+
+
+def validated_source_reference(value: Any) -> str:
+    if not note_content.valid_string(value):
+        message = "Enter a valid text Source Reference."
+        raise NoteError(message, fields={"source_reference": [message]})
+    return value.replace("\r\n", "\n").replace("\r", "\n")
+
+
 def capture(
     collection: Collection,
     content: Any,
     book: UUID | None = None,
     capture_id: UUID | None = None,
+    *,
+    page_number: int | None = None,
+    source_reference: str = "",
 ) -> tuple[Note, bool]:
     document, text = validated_content(content)
+    page_number = validated_page_number(page_number)
+    source_reference = validated_source_reference(source_reference)
     fields = {
         "content": document,
         "plain_text": text,
+        "page_number": page_number,
+        "source_reference": source_reference,
     }
     if capture_id is None:
         return Note.objects.create(
@@ -86,7 +110,11 @@ def capture(
         ), True
 
     # Compare against the original input, even if the saved Note has been edited.
-    original_input = json.dumps([str(book) if book else None, document], sort_keys=True)
+    original_fields: list[object] = [str(book) if book else None, document]
+    # Preserve fingerprints for captures made before these fields existed.
+    if page_number is not None or source_reference:
+        original_fields.extend([page_number, source_reference])
+    original_input = json.dumps(original_fields, sort_keys=True)
     fingerprint = sha256(original_input.encode()).hexdigest()
     captures = Note.objects.filter(collection=collection, capture_id=capture_id)
     note = captures.first()
@@ -112,9 +140,12 @@ def capture(
 def edit(
     collection: Collection,
     note_id: UUID,
-    content: Any,
+    *,
     revision: int,
+    content: Any = None,
     book: UUID | None | SourceChange = SourceChange.UNCHANGED,
+    page_number: int | None | SourceChange = SourceChange.UNCHANGED,
+    source_reference: str | SourceChange = SourceChange.UNCHANGED,
 ) -> Note:
     if type(revision) is not int or not 1 <= revision <= MAX_EXPECTED_REVISION:
         raise NoteError(
@@ -132,6 +163,10 @@ def edit(
         changes.update(content=document, plain_text=text)
     if not isinstance(book, SourceChange):
         changes["book_id"] = validated_book(collection, book)
+    if not isinstance(page_number, SourceChange):
+        changes["page_number"] = validated_page_number(page_number)
+    if not isinstance(source_reference, SourceChange):
+        changes["source_reference"] = validated_source_reference(source_reference)
     # Validate references before the transaction so the first transactional
     # database operation takes SQLite's write lock, including for source edits.
     with transaction.atomic():

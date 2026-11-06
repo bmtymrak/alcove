@@ -1,4 +1,4 @@
-import { noteSnapshot } from './drafts'
+import { noteSnapshot, noteSourceInputs } from './drafts'
 
 // Existing Notes use revision-checked saves; creation remains an explicit action.
 export function autosave(form, draft) {
@@ -121,6 +121,8 @@ export function autosave(form, draft) {
       conflict.querySelector('[data-current-content]').textContent = current.plain_text
       const source = [...book.options].find(option => option.value === (current.book || ''))
       conflict.querySelector('[data-current-source]').textContent = source?.textContent || current.book
+      conflict.querySelector('[data-current-page]').textContent = current.page_number ?? '—'
+      conflict.querySelector('[data-current-reference]').textContent = current.source_reference || '—'
       conflict.querySelector('[data-current-revision]').textContent = current.revision
       conflict.hidden = false
       resolve.hidden = false
@@ -141,7 +143,7 @@ export function autosave(form, draft) {
     event.preventDefault()
     if (!blocked) void save()
   })
-  book.addEventListener('change', changed)
+  noteSourceInputs(form).forEach(input => input.addEventListener('input', changed))
   window.addEventListener('beforeunload', event => {
     if (!persisted && (snapshot() !== saved || saving)) {
       event.preventDefault()

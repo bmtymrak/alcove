@@ -23,6 +23,8 @@ class Note(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
     book = models.ForeignKey(Book, null=True, blank=True, on_delete=models.SET_NULL)
+    page_number = models.PositiveIntegerField(null=True, blank=True)
+    source_reference = models.TextField(blank=True, default="")
     content = models.JSONField()
     plain_text = models.TextField()
     captured_at = models.DateTimeField(auto_now_add=True)

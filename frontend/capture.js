@@ -1,8 +1,9 @@
-import { noteSnapshot } from './drafts'
+import { noteSnapshot, noteSourceInputs } from './drafts'
 
 export function explicitCapture(form, editor, draft, initialBook) {
   const id = form.querySelector('[name="capture_id"]')
   const book = form.querySelector('[name="book"]')
+  const sourceInputs = noteSourceInputs(form)
   const status = form.querySelector('#save-status')
   const message = form.querySelector('#editor-error')
   const toolbar = form.querySelector('#formatting-tools')
@@ -12,6 +13,7 @@ export function explicitCapture(form, editor, draft, initialBook) {
 
   function persist() {
     const unsaved = !editor.isEmpty || (book.value || null) !== initialBook
+      || form.elements.page_number.value || form.elements.source_reference.value
       || form.hasAttribute('data-bound')
     const value = unsaved
       ? { snapshot: noteSnapshot(form) }
@@ -20,7 +22,7 @@ export function explicitCapture(form, editor, draft, initialBook) {
   }
 
   function lockInput(locked) {
-    book.disabled = locked
+    sourceInputs.forEach(input => { input.disabled = locked })
     toolbar.querySelectorAll('button').forEach(button => { button.disabled = locked })
     editor.setEditable(!locked)
   }
@@ -33,7 +35,7 @@ export function explicitCapture(form, editor, draft, initialBook) {
   }
 
   if (pending) unconfirmed()
-  book.addEventListener('change', persist)
+  sourceInputs.forEach(input => input.addEventListener('input', persist))
   window.addEventListener('beforeunload', event => {
     if (!persisted) {
       event.preventDefault()
